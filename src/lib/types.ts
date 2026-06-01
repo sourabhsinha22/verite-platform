@@ -97,6 +97,72 @@ export interface Engagement {
   invoices?: Invoice[]
 }
 
+export type SowStatus = 'draft' | 'sent' | 'signed' | 'active' | 'expired' | 'cancelled'
+
+export interface SowDeliverable {
+  id: string
+  sow_id: string
+  phase_id: string | null
+  title: string
+  description: string
+  due_date: string | null
+  payment_amount: number | null
+  payment_month: string | null
+  is_milestone: boolean
+  sort_order: number
+  created_at: string
+}
+
+export interface SowPhase {
+  id: string
+  sow_id: string
+  title: string
+  description: string
+  start_date: string | null
+  end_date: string | null
+  sort_order: number
+  deliverables?: SowDeliverable[]
+  created_at: string
+}
+
+export interface Sow {
+  id: string
+  engagement_id: string
+  title: string
+  version: number
+  status: SowStatus
+  effective_date: string | null
+  expiry_date: string | null
+  signed_date: string | null
+  objectives: string
+  scope_of_work: string
+  out_of_scope: string
+  assumptions: string
+  client_responsibilities: string
+  total_value: number | null
+  revenue_type: RevenueType | null
+  revenue_share_pct: number | null
+  payment_terms: string
+  billing_frequency: string
+  verite_lead: string
+  client_signatory: string
+  verite_signatory: string
+  notes: string
+  created_at: string
+  updated_at: string
+  phases?: SowPhase[]
+  deliverables?: SowDeliverable[]
+}
+
+export const SOW_STATUS_LABELS: Record<SowStatus, string> = {
+  draft: 'Draft',
+  sent: 'Sent to Client',
+  signed: 'Signed',
+  active: 'Active',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
+}
+
 export interface TeamMember {
   id: string
   name: string

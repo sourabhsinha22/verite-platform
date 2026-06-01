@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Invoice } from '@/lib/types'
-import { X } from 'lucide-react'
+import { X, ExternalLink } from 'lucide-react'
 
 interface InvoiceRow extends Invoice {
   engagement?: { id: string; name: string }
@@ -100,7 +101,7 @@ export default function InvoicesClient({ invoices }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--line-soft)', borderBottom: '1px solid var(--line)' }}>
-                {['Invoice #', 'Client', 'Engagement', 'Amount', 'Sent', 'Due', 'Paid', 'Status'].map(h => (
+                {['Invoice #', 'Client', 'Engagement', 'Amount', 'Sent', 'Due', 'Paid', 'Status', ''].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '12px 16px', fontSize: 10, color: 'var(--wine)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -122,6 +123,11 @@ export default function InvoicesClient({ invoices }: Props) {
                     <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--success)', whiteSpace: 'nowrap' }}>{fmtDate(inv.paid_date)}</td>
                     <td style={{ padding: '13px 16px' }}>
                       <span style={{ ...BADGE, ...STATUS_STYLES[status] }}>{status}</span>
+                    </td>
+                    <td style={{ padding: '13px 16px' }}>
+                      <Link href={`/invoices/${inv.id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--wine)', textDecoration: 'none' }}>
+                        View <ExternalLink size={11} />
+                      </Link>
                     </td>
                   </tr>
                 )
