@@ -52,6 +52,10 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      <style>{`
+        .dash-row:hover { background: var(--line-soft) !important; }
+        .dash-row { cursor: pointer; transition: background 0.1s; }
+      `}</style>
       <h1 style={{ fontFamily: 'var(--serif)', fontSize: '42px', fontWeight: 600, color: 'var(--navy)', marginBottom: '8px', letterSpacing: '-0.5px' }}>
         Dashboard
       </h1>
@@ -122,10 +126,7 @@ export default async function DashboardPage() {
               const engTasks = tasksByEng[eng.id] || []
               const progress = calcProgress(engTasks)
               return (
-                <tr key={eng.id} style={{ borderBottom: '1px solid var(--line-soft)', cursor: 'pointer', transition: 'background 0.1s' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--line-soft)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '')}
-                >
+                <tr key={eng.id} className="dash-row" style={{ borderBottom: '1px solid var(--line-soft)' }}>
                   <td style={{ padding: '14px 16px' }}>
                     <Link href={`/engagements/${eng.id}`} style={{ textDecoration: 'none' }}>
                       <div style={{ fontWeight: 500, color: 'var(--ink)', fontSize: '13px' }}>{eng.name}</div>

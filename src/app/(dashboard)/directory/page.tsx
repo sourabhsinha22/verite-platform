@@ -17,6 +17,7 @@ export default async function DirectoryPage() {
 
   return (
     <div>
+      <style>{`.hover-row { cursor: pointer; transition: background 0.1s; } .hover-row:hover { background: var(--line-soft) !important; }`}</style>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 36 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--serif)', fontSize: 42, fontWeight: 600, color: 'var(--navy)', letterSpacing: '-0.5px', margin: 0 }}>
@@ -50,12 +51,7 @@ export default async function DirectoryPage() {
                 const engagements = (company.engagements ?? []) as { id: string; stage: string }[]
                 const activeCount = engagements.filter(e => e.stage === 'active').length
                 return (
-                  <tr
-                    key={company.id}
-                    style={{ borderTop: i > 0 ? '1px solid var(--line-soft)' : undefined, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--line-soft)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '')}
-                  >
+                  <tr key={company.id} className="hover-row" style={{ borderTop: i > 0 ? '1px solid var(--line-soft)' : undefined }}>
                     <td style={{ padding: '14px 16px' }}>
                       <Link href={`/directory/${company.id}`} style={{ textDecoration: 'none', color: 'var(--navy)', fontWeight: 500, fontSize: 13, display: 'block' }}>
                         {company.name}
