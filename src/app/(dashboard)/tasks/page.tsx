@@ -6,6 +6,22 @@ import TasksClient from '@/components/tasks/TasksClient'
 export default async function TasksPage() {
   const supabase = await createClient()
 
+  // Get current user
+  let currentUserName: string | undefined
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: member } = await supabase
+        .from('team_members')
+        .select('name')
+        .eq('auth_user_id', user.id)
+        .single()
+      if (member?.name) currentUserName = member.name
+    }
+  } catch {
+    // proceed without current user
+  }
+
   const { data: tasks } = await supabase
     .from('tasks')
     .select('*, engagement:engagements(id, name)')
@@ -22,8 +38,7 @@ export default async function TasksPage() {
       <p style={{ color: 'var(--ink-soft)', margin: '0 0 36px' }}>
         {open} open &middot; {overdue > 0 ? <span style={{ color: 'var(--danger)' }}>{overdue} overdue</span> : '0 overdue'} &middot; {(tasks ?? []).length} total
       </p>
-      <TasksClient tasks={tasks ?? []} />
+      <TasksClient tasks={tasks ?? []} currentUserName={currentUserName} />
     </div>
   )
 }
-

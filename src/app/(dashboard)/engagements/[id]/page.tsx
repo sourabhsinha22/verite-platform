@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ChevronLeft, FileText } from 'lucide-react'
-import { Engagement, Task, RevenueItem } from '@/lib/types'
+import { Engagement, Task, RevenueItem, ActivityEntry } from '@/lib/types'
 import EngagementDetailClient from '@/components/engagements/EngagementDetailClient'
 
 interface Props {
@@ -15,11 +15,12 @@ export default async function EngagementDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: engagement }, { data: tasks }, { data: revenueItems }, { data: sows }] = await Promise.all([
+  const [{ data: engagement }, { data: tasks }, { data: revenueItems }, { data: sows }, { data: activityLog }] = await Promise.all([
     supabase.from('engagements').select('*, company:companies(id, name)').eq('id', id).single(),
     supabase.from('tasks').select('*').eq('engagement_id', id).order('sort_order'),
     supabase.from('revenue_items').select('*').eq('engagement_id', id).order('sort_order'),
     supabase.from('sows').select('id, title, status, version').eq('engagement_id', id).order('created_at', { ascending: false }).limit(1),
+    supabase.from('activity_log').select('*').eq('engagement_id', id).order('created_at', { ascending: false }).limit(50),
   ])
 
   if (!engagement) notFound()
@@ -28,6 +29,7 @@ export default async function EngagementDetailPage({ params }: Props) {
   const taskList = (tasks ?? []) as Task[]
   const revenue = (revenueItems ?? []) as RevenueItem[]
   const latestSow = sows?.[0] ?? null
+  const log = (activityLog ?? []) as ActivityEntry[]
 
   return (
     <div>
@@ -62,7 +64,7 @@ export default async function EngagementDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <EngagementDetailClient engagement={eng} tasks={taskList} revenueItems={revenue} />
+      <EngagementDetailClient engagement={eng} tasks={taskList} revenueItems={revenue} activityLog={log} />
     </div>
   )
 }

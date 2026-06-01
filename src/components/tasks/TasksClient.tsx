@@ -11,6 +11,7 @@ interface TaskRow extends Task {
 
 interface Props {
   tasks: TaskRow[]
+  currentUserName?: string
 }
 
 type Filter = TaskStatus | 'all' | 'overdue'
@@ -29,29 +30,62 @@ function isOverdue(task: Task) {
   return new Date(task.due_date) < new Date()
 }
 
-export default function TasksClient({ tasks }: Props) {
+export default function TasksClient({ tasks, currentUserName }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
+  const [ownerFilter, setOwnerFilter] = useState<string>(currentUserName ?? 'all')
+
+  // Collect unique owners
+  const owners: string[] = ['all']
+  for (const t of tasks) {
+    if (t.owner && !owners.includes(t.owner)) owners.push(t.owner)
+  }
 
   const filtered = tasks.filter(t => {
+    const ownerMatch = ownerFilter === 'all' || t.owner === ownerFilter
+    if (!ownerMatch) return false
     if (filter === 'all') return true
     if (filter === 'overdue') return isOverdue(t)
     return t.status === filter
   })
 
+  const chipBtn = (active: boolean) => ({
+    padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+    cursor: 'pointer', border: 'none',
+    background: active ? 'var(--wine)' : 'var(--line-soft)',
+    color: active ? '#fff' : 'var(--ink-soft)',
+  } as React.CSSProperties)
+
+  const statusChipBtn = (active: boolean) => ({
+    padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+    cursor: 'pointer', border: 'none',
+    background: active ? 'var(--navy)' : 'var(--line-soft)',
+    color: active ? '#fff' : 'var(--ink-soft)',
+  } as React.CSSProperties)
+
   return (
     <div>
-      {/* Filter chips */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+      {/* Owner filter chips */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginRight: 4 }}>Owner</span>
+        {owners.map(o => (
+          <button
+            key={o}
+            onClick={() => setOwnerFilter(o)}
+            style={chipBtn(ownerFilter === o)}
+          >
+            {o === 'all' ? 'All' : o}
+          </button>
+        ))}
+      </div>
+
+      {/* Status filter chips */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginRight: 4 }}>Status</span>
         {FILTERS.map(f => (
           <button
             key={f.value}
             onClick={() => setFilter(f.value)}
-            style={{
-              padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-              cursor: 'pointer', border: 'none',
-              background: filter === f.value ? 'var(--navy)' : 'var(--line-soft)',
-              color: filter === f.value ? '#fff' : 'var(--ink-soft)',
-            }}
+            style={statusChipBtn(filter === f.value)}
           >
             {f.label}
           </button>

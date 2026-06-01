@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Invoice } from '@/lib/types'
 import InvoiceDetailActions from '@/components/invoices/InvoiceDetailActions'
+import CopyPaymentLink from '@/components/invoices/CopyPaymentLink'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -245,6 +246,7 @@ export default async function InvoiceDetailPage({ params }: Props) {
             Actions
           </div>
           <div style={{ padding: 16 }}>
+            <CopyPaymentLink invoiceId={invoice.id} />
             <InvoiceDetailActions
               invoiceId={invoice.id}
               status={computedStatus}

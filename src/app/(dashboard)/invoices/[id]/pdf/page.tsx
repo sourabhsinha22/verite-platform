@@ -413,6 +413,21 @@ export default async function InvoicePdfPage({ params }: Props) {
             </div>
           )}
 
+          {/* Pay Online link */}
+          {status !== 'paid' && (
+            <div style={{ marginBottom: 20 }}>
+              <div className="label">Pay Online</div>
+              <div className="value">
+                <a
+                  href={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://verite-platform.vercel.app'}/pay/${id}`}
+                  style={{ color: '#5f3e3f', textDecoration: 'underline', fontSize: 13 }}
+                >
+                  {`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://verite-platform.vercel.app'}/pay/${id}`}
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* Footer */}
           <div className="footer">
             Vérité Health Collective · veritehealth.com

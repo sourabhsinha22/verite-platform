@@ -6,14 +6,16 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Engagement, Task, RevenueItem, TaskStatus, EngagementStage,
   TASK_STATUS_LABELS, ENGAGEMENT_STAGE_LABELS, ENGAGEMENT_TYPE_LABELS,
+  ActivityEntry, ActivityEntryType, ACTIVITY_TYPE_LABELS,
 } from '@/lib/types'
 import Badge from '@/components/ui/Badge'
 import { Trash2, Plus } from 'lucide-react'
 
 interface Props {
-  engagement: Engagement
+  engagement: Engagement & { company?: { id: string; name: string } }
   tasks: Task[]
   revenueItems: RevenueItem[]
+  activityLog: ActivityEntry[]
 }
 
 const inputStyle: React.CSSProperties = {
@@ -39,7 +41,33 @@ function fmtCurrency(n: number) {
   return `$${n.toLocaleString()}`
 }
 
-export default function EngagementDetailClient({ engagement: initialEng, tasks: initialTasks, revenueItems: initialRevenue }: Props) {
+function fmtDateTime(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+const ENTRY_TYPE_COLORS: Record<ActivityEntryType, string> = {
+  note: 'var(--navy)',
+  call: 'var(--success)',
+  meeting: 'var(--wine)',
+  email: 'var(--indigo)',
+  status: 'var(--warn)',
+  milestone: 'var(--success)',
+}
+
+const ENTRY_TYPE_PLACEHOLDERS: Record<ActivityEntryType, string> = {
+  note: 'Add a note about this engagement…',
+  call: 'Summarize the call…',
+  meeting: 'What was discussed?',
+  email: 'Email summary or content…',
+  status: 'Describe the status update…',
+  milestone: 'Describe the milestone reached…',
+}
+
+const ENTRY_TYPES: ActivityEntryType[] = ['note', 'call', 'meeting', 'email', 'status', 'milestone']
+
+export default function EngagementDetailClient({ engagement: initialEng, tasks: initialTasks, revenueItems: initialRevenue, activityLog: initialLog }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -48,6 +76,12 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
   const [tasks, setTasks] = useState(initialTasks)
   const [revenue, setRevenue] = useState(initialRevenue)
   const [saveMsg, setSaveMsg] = useState('')
+  const [log, setLog] = useState<ActivityEntry[]>(initialLog)
+
+  // Activity log form state
+  const [newEntryType, setNewEntryType] = useState<ActivityEntryType>('note')
+  const [newEntryContent, setNewEntryContent] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const saveEng = async (field: keyof Engagement, value: string | number) => {
     await supabase.from('engagements').update({ [field]: value }).eq('id', eng.id)
@@ -99,6 +133,35 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
     setRevenue(prev => prev.filter(r => r.id !== id))
   }
 
+  const submitActivityEntry = async () => {
+    if (!newEntryContent.trim()) return
+    setSubmitting(true)
+    const optimistic: ActivityEntry = {
+      id: `temp-${Date.now()}`,
+      engagement_id: eng.id,
+      author: eng.lead || 'Team',
+      author_id: null,
+      entry_type: newEntryType,
+      content: newEntryContent.trim(),
+      metadata: {},
+      created_at: new Date().toISOString(),
+    }
+    setLog(prev => [optimistic, ...prev])
+    setNewEntryContent('')
+
+    const { data } = await supabase.from('activity_log').insert({
+      engagement_id: eng.id,
+      author: eng.lead || 'Team',
+      entry_type: newEntryType,
+      content: optimistic.content,
+    }).select().single()
+
+    if (data) {
+      setLog(prev => prev.map(e => e.id === optimistic.id ? data : e))
+    }
+    setSubmitting(false)
+  }
+
   const salesTasks = tasks.filter(t => t.task_group === 'sales')
   const projectTasks = tasks.filter(t => t.task_group === 'project')
   const customTasks = tasks.filter(t => t.task_group === 'custom')
@@ -148,7 +211,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
         {[
           { label: 'Lead', field: 'lead' as keyof Engagement },
           { label: 'Start Date', field: 'start_date' as keyof Engagement },
-        ].map(({ label, field }, idx) => (
+        ].map(({ label, field }) => (
           <div key={field} style={{ padding: '16px 20px', borderRight: '1px solid var(--line-soft)' }}>
             <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>{label}</div>
             <input
@@ -396,7 +459,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
       </div>
 
       {/* Notes */}
-      <div>
+      <div style={{ marginBottom: 40 }}>
         <h2 style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 600, color: 'var(--navy)', marginBottom: 12 }}>Notes</h2>
         <textarea
           defaultValue={eng.notes ?? ''}
@@ -409,6 +472,125 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
           }}
           placeholder="Notes about this engagement…"
         />
+      </div>
+
+      {/* Activity Log */}
+      <div style={{ marginBottom: 40 }}>
+        <h2 style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 600, color: 'var(--navy)', marginBottom: 16 }}>
+          Activity Log
+          <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--ink-faint)', marginLeft: 10, fontFamily: 'var(--sans)' }}>
+            {log.length} {log.length === 1 ? 'entry' : 'entries'}
+          </span>
+        </h2>
+
+        {/* Add entry form */}
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
+          padding: '16px 20px', marginBottom: 20,
+        }}>
+          {/* Type selector */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            {ENTRY_TYPES.map(t => (
+              <button
+                key={t}
+                onClick={() => setNewEntryType(t)}
+                style={{
+                  padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+                  cursor: 'pointer', border: 'none',
+                  background: newEntryType === t ? ENTRY_TYPE_COLORS[t] : 'var(--line-soft)',
+                  color: newEntryType === t ? '#fff' : 'var(--ink-soft)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {ACTIVITY_TYPE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+
+          {/* Textarea */}
+          <textarea
+            value={newEntryContent}
+            onChange={e => setNewEntryContent(e.target.value)}
+            rows={3}
+            placeholder={ENTRY_TYPE_PLACEHOLDERS[newEntryType]}
+            style={{
+              fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ink)',
+              background: 'var(--bg)', border: '1px solid var(--line)',
+              borderRadius: 4, padding: '10px 12px', width: '100%', boxSizing: 'border-box',
+              resize: 'vertical', marginBottom: 10,
+            }}
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={submitActivityEntry}
+              disabled={submitting || !newEntryContent.trim()}
+              style={{
+                padding: '8px 20px', borderRadius: 4, fontSize: 13, fontWeight: 600,
+                background: 'var(--wine)', color: '#fff', border: 'none', cursor: 'pointer',
+                opacity: submitting || !newEntryContent.trim() ? 0.6 : 1,
+              }}
+            >
+              {submitting ? 'Adding…' : 'Add'}
+            </button>
+          </div>
+        </div>
+
+        {/* Log entries */}
+        {log.length === 0 ? (
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
+            padding: '40px 32px', textAlign: 'center', color: 'var(--ink-faint)', fontSize: 13,
+          }}>
+            No activity yet. Add the first entry above.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {log.map(entry => (
+              <div
+                key={entry.id}
+                style={{
+                  background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
+                  padding: '14px 18px',
+                }}
+              >
+                {/* Header row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* Colored dot */}
+                    <div style={{
+                      width: 10, height: 10, borderRadius: '50%',
+                      background: ENTRY_TYPE_COLORS[entry.entry_type],
+                      flexShrink: 0,
+                    }} />
+                    {/* Author */}
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                      {entry.author}
+                    </span>
+                    {/* Type badge */}
+                    <span style={{
+                      padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600,
+                      letterSpacing: '0.08em', textTransform: 'uppercase',
+                      background: ENTRY_TYPE_COLORS[entry.entry_type] + '22',
+                      color: ENTRY_TYPE_COLORS[entry.entry_type],
+                      border: `1px solid ${ENTRY_TYPE_COLORS[entry.entry_type]}44`,
+                    }}>
+                      {ACTIVITY_TYPE_LABELS[entry.entry_type]}
+                    </span>
+                  </div>
+                  {/* Date */}
+                  <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
+                    {fmtDateTime(entry.created_at)}
+                  </span>
+                </div>
+                {/* Content */}
+                <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.6, whiteSpace: 'pre-wrap', paddingLeft: 20 }}>
+                  {entry.content}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

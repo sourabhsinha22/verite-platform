@@ -97,6 +97,47 @@ export interface Engagement {
   invoices?: Invoice[]
 }
 
+export type ActivityEntryType = 'note' | 'call' | 'meeting' | 'email' | 'status' | 'milestone'
+
+export interface ActivityEntry {
+  id: string
+  engagement_id: string
+  author: string
+  author_id: string | null
+  entry_type: ActivityEntryType
+  content: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export const ACTIVITY_TYPE_LABELS: Record<ActivityEntryType, string> = {
+  note: 'Note',
+  call: 'Call',
+  meeting: 'Meeting',
+  email: 'Email',
+  status: 'Status Update',
+  milestone: 'Milestone',
+}
+
+export const ACTIVITY_TYPE_ICONS: Record<ActivityEntryType, string> = {
+  note: '📝',
+  call: '📞',
+  meeting: '🤝',
+  email: '✉️',
+  status: '🔄',
+  milestone: '🎯',
+}
+
+export interface NotificationSettings {
+  id: string
+  team_member_id: string
+  notify_overdue_invoices: boolean
+  notify_tasks_due: boolean
+  notify_new_engagement: boolean
+  notify_task_assigned: boolean
+  email: string
+}
+
 export type SowStatus = 'draft' | 'sent' | 'signed' | 'active' | 'expired' | 'cancelled'
 
 export interface SowDeliverable {

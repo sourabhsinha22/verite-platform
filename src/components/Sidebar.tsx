@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
-  FileText, Settings, LogOut, TrendingUp, FileCheck
+  FileText, Settings, LogOut, TrendingUp, FileCheck, Bell
 } from 'lucide-react'
 
 const navItems = [
@@ -17,9 +17,20 @@ const navItems = [
   { href: '/tasks',       label: 'My Tasks',     icon: CheckSquare },
   { href: '/reports',     label: 'Reports',      icon: FileText },
   { href: '/settings',    label: 'Settings',     icon: Settings },
+  { href: '/settings/notifications', label: 'Notifications', icon: Bell },
 ]
 
-export default function Sidebar() {
+interface CurrentUser {
+  name: string
+  email: string
+  initials: string
+}
+
+interface Props {
+  currentUser?: CurrentUser
+}
+
+export default function Sidebar({ currentUser }: Props) {
   const pathname = usePathname()
   const supabase = createClient()
 
@@ -89,6 +100,7 @@ export default function Sidebar() {
               transition: 'all 0.15s',
               background: isActive(href) ? 'rgba(227,188,166,0.18)' : 'transparent',
               color: isActive(href) ? '#fff' : '#c9bdb3',
+              paddingLeft: href === '/settings/notifications' ? '28px' : '12px',
             }}
           >
             <Icon size={15} style={{ opacity: 0.85 }} />
@@ -99,6 +111,41 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
+        {/* Current user */}
+        {currentUser && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '8px 10px',
+            marginBottom: '6px',
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: 'var(--blush)',
+              color: 'var(--wine)',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              {currentUser.initials}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser.name}
+              </div>
+              <div style={{ fontSize: '11px', color: '#9a9aa5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser.email}
+              </div>
+            </div>
+          </div>
+        )}
+
         <button
           onClick={handleSignOut}
           style={{
