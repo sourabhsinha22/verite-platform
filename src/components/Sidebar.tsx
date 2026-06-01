@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/',             label: 'Dashboard',    icon: LayoutDashboard },
+  { href: '/dashboard',   label: 'Dashboard',    icon: LayoutDashboard },
   { href: '/directory',   label: 'Directory',    icon: Building2 },
   { href: '/engagements', label: 'Engagements',  icon: Briefcase },
   { href: '/revenue',     label: 'Revenue',      icon: TrendingUp },
@@ -29,7 +29,7 @@ export default function Sidebar() {
   }
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
+    if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/'
     return pathname.startsWith(href)
   }
 
