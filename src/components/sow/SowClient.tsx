@@ -435,18 +435,24 @@ function SowEditor({
       })
       .eq('id', sow.id)
     setSaving(false)
-    if (!error) {
-      setStatusMsg('Saved')
-      setTimeout(() => setStatusMsg(null), 2500)
-      router.refresh()
+    if (error) {
+      setStatusMsg('Save failed: ' + error.message)
+      return
     }
+    setStatusMsg('Saved')
+    setTimeout(() => setStatusMsg(null), 2500)
+    router.refresh()
   }
 
   async function advanceStatus(next: SowStatus) {
     const supabase = createClient()
     const updates: Partial<Sow> = { status: next }
     if (next === 'signed') updates.signed_date = new Date().toISOString().slice(0, 10)
-    await supabase.from('sows').update(updates).eq('id', sow.id)
+    const { error } = await supabase.from('sows').update(updates).eq('id', sow.id)
+    if (error) {
+      setStatusMsg('Status update failed: ' + error.message)
+      return
+    }
     setSow(prev => ({ ...prev, ...updates }))
     router.refresh()
   }
@@ -472,14 +478,22 @@ function SowEditor({
   }
 
   async function updateDeliverable(id: string, k: keyof SowDeliverable, v: string | number | boolean | null) {
-    setDeliverables(prev => prev.map(d => (d.id === id ? { ...d, [k]: v } : d)))
     const supabase = createClient()
-    await supabase.from('sow_deliverables').update({ [k]: v }).eq('id', id)
+    const { error } = await supabase.from('sow_deliverables').update({ [k]: v }).eq('id', id)
+    if (error) {
+      setStatusMsg('Update failed: ' + error.message)
+      return
+    }
+    setDeliverables(prev => prev.map(d => (d.id === id ? { ...d, [k]: v } : d)))
   }
 
   async function deleteDeliverable(id: string) {
     const supabase = createClient()
-    await supabase.from('sow_deliverables').delete().eq('id', id)
+    const { error } = await supabase.from('sow_deliverables').delete().eq('id', id)
+    if (error) {
+      setStatusMsg('Delete failed: ' + error.message)
+      return
+    }
     setDeliverables(prev => prev.filter(d => d.id !== id))
   }
 

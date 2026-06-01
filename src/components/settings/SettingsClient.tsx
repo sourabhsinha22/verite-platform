@@ -28,22 +28,32 @@ export default function SettingsClient({ members: initialMembers }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', role: '' })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const addMember = async () => {
     if (!form.name || !form.email) return
+    setError('')
     setSaving(true)
-    const { data } = await supabase.from('team_members').insert(form).select().single()
+    const { data, error: err } = await supabase.from('team_members').insert(form).select().single()
+    setSaving(false)
+    if (err) {
+      setError(err.message)
+      return
+    }
     if (data) {
       setMembers(prev => [...prev, data])
       setForm({ name: '', email: '', role: '' })
       setShowAdd(false)
     }
-    setSaving(false)
   }
 
   const deleteMember = async (id: string) => {
     if (!confirm('Remove this team member?')) return
-    await supabase.from('team_members').delete().eq('id', id)
+    const { error: err } = await supabase.from('team_members').delete().eq('id', id)
+    if (err) {
+      alert('Failed to remove member: ' + err.message)
+      return
+    }
     setMembers(prev => prev.filter(m => m.id !== id))
   }
 
@@ -77,11 +87,16 @@ export default function SettingsClient({ members: initialMembers }: Props) {
                 <input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={inputStyle} placeholder="e.g. Analyst" />
               </div>
             </div>
+            {error && (
+              <div style={{ marginBottom: 10, padding: '7px 12px', background: 'var(--danger-soft)', borderRadius: 4, color: 'var(--danger)', fontSize: 13 }}>
+                {error}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={addMember} disabled={saving} style={{ background: 'var(--wine)', color: '#fff', padding: '7px 14px', borderRadius: 4, fontSize: 13, border: 'none', cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Saving…' : 'Add'}
               </button>
-              <button onClick={() => setShowAdd(false)} style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--navy)', padding: '7px 14px', borderRadius: 4, fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => { setShowAdd(false); setError('') }} style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--navy)', padding: '7px 14px', borderRadius: 4, fontSize: 13, cursor: 'pointer' }}>
                 Cancel
               </button>
             </div>

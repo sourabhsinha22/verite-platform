@@ -11,7 +11,7 @@ export default async function EngagementsPage() {
     supabase.from('tasks').select('engagement_id, status'),
   ])
 
-  // Build progress map: engagementId â†’ % done
+  // Build progress map: engagementId → % done
   const progressMap: Record<string, number> = {}
   const countMap: Record<string, { done: number; total: number }> = {}
   for (const t of tasks ?? []) {
@@ -30,7 +30,7 @@ export default async function EngagementsPage() {
           Engagements
         </h1>
         <p style={{ color: 'var(--ink-soft)', marginTop: 8, marginBottom: 0 }}>
-          {(engagements ?? []).length} total Â· {(engagements ?? []).filter(e => e.stage === 'active').length} active
+          {(engagements ?? []).length} total · {(engagements ?? []).filter(e => e.stage === 'active').length} active
         </p>
       </div>
       <EngagementsClient engagements={engagements ?? []} progressMap={progressMap} />

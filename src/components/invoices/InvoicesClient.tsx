@@ -16,10 +16,11 @@ interface Props {
   invoices: InvoiceRow[]
 }
 
-function computeStatus(invoice: Invoice): 'paid' | 'overdue' | 'open' {
+function computeStatus(invoice: Invoice): 'paid' | 'overdue' | 'open' | 'draft' | 'sent' {
   if (invoice.paid_date) return 'paid'
+  if (invoice.status === 'draft') return 'draft'
   if (invoice.due_date && new Date(invoice.due_date) < new Date()) return 'overdue'
-  return 'open'
+  return invoice.status as 'sent' | 'open'
 }
 
 function fmt(n: number) {
@@ -174,7 +175,7 @@ function NewInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreate
       ...form,
       invoice_number: form.invoice_number.trim(),
       amount: parseFloat(form.amount),
-      status: 'sent',
+      status: form.date_sent ? 'sent' : 'draft',
       engagement_id: form.engagement_id || null,
       company_id: form.company_id || null,
       due_date: form.due_date || null,

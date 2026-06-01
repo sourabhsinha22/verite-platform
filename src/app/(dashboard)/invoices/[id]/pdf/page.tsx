@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { Invoice } from '@/lib/types'
+import PdfPrintButton from '@/components/reports/PdfPrintButton'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -203,22 +204,7 @@ export default async function InvoicePdfPage({ params }: Props) {
           >
             ← Back to Invoice
           </a>
-          <button
-            onClick={() => window.print()}
-            style={{
-              background: '#5f3e3f',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 5,
-              padding: '7px 16px',
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: 'Inter, sans-serif',
-              cursor: 'pointer',
-            }}
-          >
-            Print / Save as PDF
-          </button>
+          <PdfPrintButton />
         </div>
 
         <div className="page">
