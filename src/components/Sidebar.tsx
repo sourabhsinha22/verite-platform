@@ -5,13 +5,16 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
-  FileText, Settings, LogOut, TrendingUp, FileCheck, Bell
+  FileText, Settings, LogOut, TrendingUp, FileCheck, Bell,
+  Kanban, BarChart2
 } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard',   label: 'Dashboard',    icon: LayoutDashboard },
   { href: '/directory',   label: 'Directory',    icon: Building2 },
   { href: '/engagements', label: 'Engagements',  icon: Briefcase },
+  { href: '/pipeline',    label: 'Pipeline',     icon: Kanban },
+  { href: '/forecast',    label: 'Forecast',     icon: BarChart2 },
   { href: '/revenue',     label: 'Revenue',      icon: TrendingUp },
   { href: '/invoices',    label: 'Invoices',     icon: FileCheck },
   { href: '/tasks',       label: 'My Tasks',     icon: CheckSquare },

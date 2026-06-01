@@ -90,6 +90,9 @@ export interface Engagement {
   revenue_share_pct: number | null
   notes: string
   health: 'green' | 'yellow' | 'red'
+  probability: number | null
+  expected_close_date: string | null
+  pipeline_notes: string
   created_at: string
   company?: Company
   tasks?: Task[]

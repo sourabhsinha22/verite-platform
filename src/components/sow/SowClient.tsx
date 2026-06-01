@@ -11,7 +11,8 @@ import {
   SOW_STATUS_LABELS,
   RevenueType,
 } from '@/lib/types'
-import { Plus, Trash2, FileText, Download, CheckCircle, Save, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Trash2, FileText, Download, CheckCircle, Save, ArrowRight, FileCheck } from 'lucide-react'
 
 interface Props {
   engagement: Engagement & { company?: { id: string; name: string } }
@@ -797,6 +798,14 @@ function SowEditor({
         >
           <Download size={14} /> Download PDF
         </a>
+        {(sow.status === 'sent' || sow.status === 'signed' || sow.status === 'active') && (
+          <Link
+            href={`/engagements/${engagementId}/sow/proposal`}
+            style={actionBtnStyle('var(--indigo)', true)}
+          >
+            <FileCheck size={14} /> Generate Proposal →
+          </Link>
+        )}
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {statusMsg && (
