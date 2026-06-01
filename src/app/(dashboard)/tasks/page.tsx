@@ -1,4 +1,6 @@
-﻿import { createClient } from '@/lib/supabase/server'
+export const dynamic = 'force-dynamic'
+
+import { createClient } from '@/lib/supabase/server'
 import TasksClient from '@/components/tasks/TasksClient'
 
 export default async function TasksPage() {

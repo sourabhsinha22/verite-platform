@@ -1,3 +1,5 @@
+﻿export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import Badge from '@/components/ui/Badge'
@@ -61,13 +63,13 @@ export default async function DirectoryPage() {
                       {company.address && <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2 }}>{company.address}</div>}
                     </td>
                     <td style={{ padding: '14px 16px' }}><Badge tag={(company.tag as CompanyTag) || 'prospect'} /></td>
-                    <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>{company.industry || '—'}</td>
+                    <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>{company.industry || 'â€”'}</td>
                     <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--ink-soft)', textAlign: 'center' }}>{contacts.length}</td>
                     <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>
                       {engagements.length}
                       {activeCount > 0 && <span style={{ color: 'var(--success)', marginLeft: 6, fontSize: 12 }}>({activeCount} active)</span>}
                     </td>
-                    <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>{company.account_owner || '—'}</td>
+                    <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>{company.account_owner || 'â€”'}</td>
                   </tr>
                 )
               })}

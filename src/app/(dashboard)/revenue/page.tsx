@@ -1,3 +1,5 @@
+﻿export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import StatCard from '@/components/ui/StatCard'
@@ -13,7 +15,7 @@ function fmtFull(n: number) {
 }
 
 function fmtMonth(m: string | null) {
-  if (!m) return '—'
+  if (!m) return 'â€”'
   return new Date(m + '-02').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
@@ -43,7 +45,7 @@ export default async function RevenuePage() {
       byEngagement[eng.id] = {
         engagementId: eng.id,
         engagementName: eng.name,
-        companyName: eng.company?.name ?? '—',
+        companyName: eng.company?.name ?? 'â€”',
         companyId: eng.company?.id ?? '',
         rows: [],
       }
@@ -85,9 +87,9 @@ export default async function RevenuePage() {
                     <Link href={`/engagements/${group.engagementId}`} style={{ fontFamily: 'var(--serif)', fontSize: 17, fontWeight: 600, color: 'var(--navy)', textDecoration: 'none' }}>
                       {group.engagementName}
                     </Link>
-                    {group.companyName !== '—' && (
+                    {group.companyName !== 'â€”' && (
                       <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
-                        — {group.companyName}
+                        â€” {group.companyName}
                       </span>
                     )}
                   </div>
@@ -120,10 +122,10 @@ export default async function RevenuePage() {
                           <td style={{ padding: '11px 16px', fontSize: 13, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{fmtMonth(item.month)}</td>
                           <td style={{ padding: '11px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>{fmtFull(item.forecast_amount)}</td>
                           <td style={{ padding: '11px 16px', fontSize: 13, color: hasActual ? 'var(--success)' : 'var(--ink-faint)', fontWeight: hasActual ? 500 : 400 }}>
-                            {hasActual ? fmtFull(item.actual_amount!) : '—'}
+                            {hasActual ? fmtFull(item.actual_amount!) : 'â€”'}
                           </td>
                           <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 500, color: !hasActual ? 'var(--ink-faint)' : v >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                            {hasActual ? (v >= 0 ? '+' : '') + fmtFull(v) : '—'}
+                            {hasActual ? (v >= 0 ? '+' : '') + fmtFull(v) : 'â€”'}
                           </td>
                           <td style={{ padding: '11px 16px' }}>
                             {hasActual ? (

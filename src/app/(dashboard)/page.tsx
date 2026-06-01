@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import StatCard from '@/components/ui/StatCard'
@@ -131,7 +133,7 @@ export default async function DashboardPage() {
                     </Link>
                   </td>
                   <td style={{ padding: '14px 16px' }}><Badge type={eng.engagement_type as EngagementType} /></td>
-                  <td style={{ padding: '14px 16px', fontSize: '13px', color: 'var(--ink-soft)' }}>{eng.lead || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: 'var(--ink-soft)' }}>{eng.lead || 'â€”'}</td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ width: '80px', height: '4px', background: 'var(--line)', borderRadius: '2px', overflow: 'hidden' }}>
@@ -149,7 +151,7 @@ export default async function DashboardPage() {
         {activeEngs.length === 0 && (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--ink-faint)', fontSize: '13px' }}>
             No active engagements yet.{' '}
-            <Link href="/engagements" style={{ color: 'var(--wine)', textDecoration: 'none' }}>Create one →</Link>
+            <Link href="/engagements" style={{ color: 'var(--wine)', textDecoration: 'none' }}>Create one â†’</Link>
           </div>
         )}
       </div>

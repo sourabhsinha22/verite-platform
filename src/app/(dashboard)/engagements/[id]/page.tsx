@@ -1,59 +1,39 @@
+export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
-import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
-import { Engagement, Task, RevenueItem } from '@/lib/types'
-import EngagementDetailClient from '@/components/engagements/EngagementDetailClient'
+import EngagementsClient from '@/components/engagements/EngagementsClient'
 
-interface Props {
-  params: { id: string }
-}
-
-export default async function EngagementDetailPage({ params }: Props) {
+export default async function EngagementsPage() {
   const supabase = await createClient()
 
-  const { data: engagement } = await supabase
-    .from('engagements')
-    .select('*, company:companies(id, name)')
-    .eq('id', params.id)
-    .single()
+  const [{ data: engagements }, { data: tasks }] = await Promise.all([
+    supabase.from('engagements').select('*, company:companies(id, name)').order('created_at', { ascending: false }),
+    supabase.from('tasks').select('engagement_id, status'),
+  ])
 
-  if (!engagement) notFound()
-
-  const { data: tasks } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('engagement_id', params.id)
-    .order('sort_order')
-
-  const { data: revenueItems } = await supabase
-    .from('revenue_items')
-    .select('*')
-    .eq('engagement_id', params.id)
-    .order('sort_order')
-
-  const eng = engagement as Engagement & { company?: { id: string; name: string } }
-  const taskList = (tasks ?? []) as Task[]
-  const revenue = (revenueItems ?? []) as RevenueItem[]
+  // Build progress map: engagementId â†’ % done
+  const progressMap: Record<string, number> = {}
+  const countMap: Record<string, { done: number; total: number }> = {}
+  for (const t of tasks ?? []) {
+    if (!countMap[t.engagement_id]) countMap[t.engagement_id] = { done: 0, total: 0 }
+    countMap[t.engagement_id].total++
+    if (t.status === 'done') countMap[t.engagement_id].done++
+  }
+  for (const [id, { done, total }] of Object.entries(countMap)) {
+    progressMap[id] = total > 0 ? Math.round((done / total) * 100) : 0
+  }
 
   return (
-    <div style={{ padding: '40px 56px' }}>
-      {/* Back */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <Link href="/engagements" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          color: 'var(--ink-soft)', textDecoration: 'none', fontSize: 13,
-        }}>
-          <ChevronLeft size={14} /> Engagements
-        </Link>
-        {eng.company && (
-          <Link href={`/directory/${eng.company.id}`} style={{ fontSize: 13, color: 'var(--wine)', textDecoration: 'none' }}>
-            {eng.company.name} →
-          </Link>
-        )}
+    <div>
+      <div style={{ marginBottom: 36 }}>
+        <h1 style={{ fontFamily: 'var(--serif)', fontSize: 42, fontWeight: 600, color: 'var(--navy)', letterSpacing: '-0.5px', margin: 0 }}>
+          Engagements
+        </h1>
+        <p style={{ color: 'var(--ink-soft)', marginTop: 8, marginBottom: 0 }}>
+          {(engagements ?? []).length} total Â· {(engagements ?? []).filter(e => e.stage === 'active').length} active
+        </p>
       </div>
-
-      <EngagementDetailClient engagement={eng} tasks={taskList} revenueItems={revenue} />
+      <EngagementsClient engagements={engagements ?? []} progressMap={progressMap} />
     </div>
   )
 }

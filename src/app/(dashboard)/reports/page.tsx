@@ -1,4 +1,6 @@
-﻿import { createClient } from '@/lib/supabase/server'
+export const dynamic = 'force-dynamic'
+
+import { createClient } from '@/lib/supabase/server'
 import { Engagement, Task } from '@/lib/types'
 import Badge from '@/components/ui/Badge'
 import PrintButton from '@/components/reports/PrintButton'

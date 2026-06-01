@@ -1,4 +1,6 @@
-﻿import { createClient } from '@/lib/supabase/server'
+export const dynamic = 'force-dynamic'
+
+import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/ui/StatCard'
 import InvoicesClient from '@/components/invoices/InvoicesClient'
 import { Invoice } from '@/lib/types'
