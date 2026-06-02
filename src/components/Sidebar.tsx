@@ -2,31 +2,49 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
-  FileText, Settings, LogOut, TrendingUp, FileCheck, Bell,
-  Kanban, BarChart2, Building, Users, ArrowLeftRight, UserCheck, Activity, Receipt
+  FileText, Settings, LogOut, TrendingUp, FileCheck,
+  Kanban, Building,
 } from 'lucide-react'
 
-const navItems = [
-  { href: '/dashboard',   label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/directory',   label: 'Directory',    icon: Building2 },
-  { href: '/engagements', label: 'Engagements',  icon: Briefcase },
-  { href: '/pipeline',    label: 'Pipeline',     icon: Kanban },
-  { href: '/forecast',    label: 'Forecast',     icon: BarChart2 },
-  { href: '/revenue',     label: 'Revenue',      icon: TrendingUp },
-  { href: '/pnl',        label: 'P&L',          icon: Receipt },
-  { href: '/cashflow',   label: 'Cash Flow',    icon: Activity },
-  { href: '/bank',        label: 'Bank Balance', icon: Building },
-  { href: '/distributions', label: 'Distributions', icon: Users },
-  { href: '/reimbursements', label: 'Reimbursements', icon: ArrowLeftRight },
-  { href: '/contractors', label: 'Contractors',  icon: UserCheck },
-  { href: '/invoices',    label: 'Invoices',     icon: FileCheck },
-  { href: '/tasks',       label: 'My Tasks',     icon: CheckSquare },
-  { href: '/reports',     label: 'Reports',      icon: FileText },
-  { href: '/settings',    label: 'Settings',     icon: Settings },
-  { href: '/settings/notifications', label: 'Notifications', icon: Bell },
+const NAV_GROUPS = [
+  {
+    id: 'work',
+    label: 'Work',
+    defaultOpen: true,
+    items: [
+      { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+      { href: '/tasks',       label: 'My Tasks',    icon: CheckSquare },
+      { href: '/engagements', label: 'Engagements', icon: Briefcase },
+      { href: '/pipeline',    label: 'Pipeline',    icon: Kanban },
+    ],
+  },
+  {
+    id: 'clients',
+    label: 'Clients',
+    defaultOpen: true,
+    items: [
+      { href: '/directory', label: 'Directory', icon: Building2 },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Finance',
+    defaultOpen: false,
+    items: [
+      { href: '/invoices', label: 'Invoices',    icon: FileCheck },
+      { href: '/finance',  label: 'Analytics',  icon: TrendingUp },
+      { href: '/money',    label: 'Cash & Ops', icon: Building },
+    ],
+  },
+]
+
+const STANDALONE = [
+  { href: '/reports',  label: 'Reports',  icon: FileText },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 interface CurrentUser {
@@ -43,6 +61,26 @@ export default function Sidebar({ currentUser }: Props) {
   const pathname = usePathname()
   const supabase = createClient()
 
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') {
+      return { work: true, clients: true, finance: false }
+    }
+    try {
+      const saved = localStorage.getItem('verite-sidebar-groups')
+      return saved ? JSON.parse(saved) : { work: true, clients: true, finance: false }
+    } catch {
+      return { work: true, clients: true, finance: false }
+    }
+  })
+
+  const toggleGroup = (id: string) => {
+    setOpenGroups(prev => {
+      const next = { ...prev, [id]: !prev[id] }
+      try { localStorage.setItem('verite-sidebar-groups', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     window.location.href = '/login'
@@ -50,6 +88,8 @@ export default function Sidebar({ currentUser }: Props) {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/'
+    if (href === '/finance') return pathname.startsWith('/finance') || ['/revenue', '/pnl', '/cashflow', '/forecast'].includes(pathname)
+    if (href === '/money') return pathname.startsWith('/money') || ['/bank', '/distributions', '/reimbursements', '/contractors'].includes(pathname)
     return pathname.startsWith(href)
   }
 
@@ -92,27 +132,69 @@ export default function Sidebar({ currentUser }: Props) {
       </div>
 
       {/* Nav */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-        {navItems.map(({ href, label, icon: Icon }) => (
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1 }}>
+        {NAV_GROUPS.map(group => (
+          <div key={group.id} style={{ marginBottom: 4 }}>
+            <button
+              onClick={() => toggleGroup(group.id)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', padding: '6px 12px 4px',
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: 'rgba(227,188,166,0.6)',
+                fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+              }}
+            >
+              <span>{group.label}</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
+                style={{ transform: openGroups[group.id] ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', opacity: 0.6 }}>
+                <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+
+            {openGroups[group.id] && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {group.items.map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 12px',
+                      borderRadius: 6,
+                      fontSize: 13, fontWeight: 500, textDecoration: 'none',
+                      transition: 'all 0.15s',
+                      background: isActive(href) ? 'rgba(227,188,166,0.18)' : 'transparent',
+                      color: isActive(href) ? '#fff' : '#c9bdb3',
+                    }}
+                  >
+                    <Icon size={14} style={{ opacity: 0.85 }} />
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Separator */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '8px 0' }} />
+
+        {/* Standalone items */}
+        {STANDALONE.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '10px 12px',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: 500,
-              textDecoration: 'none',
-              transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 12px', borderRadius: 6,
+              fontSize: 13, fontWeight: 500, textDecoration: 'none',
               background: isActive(href) ? 'rgba(227,188,166,0.18)' : 'transparent',
               color: isActive(href) ? '#fff' : '#c9bdb3',
-              paddingLeft: href === '/settings/notifications' ? '28px' : '12px',
             }}
           >
-            <Icon size={15} style={{ opacity: 0.85 }} />
+            <Icon size={14} style={{ opacity: 0.85 }} />
             {label}
           </Link>
         ))}
@@ -120,7 +202,6 @@ export default function Sidebar({ currentUser }: Props) {
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
-        {/* Current user */}
         {currentUser && (
           <div style={{
             display: 'flex',
