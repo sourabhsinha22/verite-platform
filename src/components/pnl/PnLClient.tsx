@@ -25,6 +25,12 @@ interface Props {
   hasExpenses: boolean
 }
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function fmtMonthHeader(ym: string): string {
+  const [y, m] = ym.split('-')
+  return `${MONTHS[parseInt(m) - 1]} '${y.slice(2)}`
+}
+
 function fmtCurrency(n: number): string {
   if (n === 0) return '-'
   const abs = Math.abs(n)
@@ -175,7 +181,9 @@ export default function PnLClient({ months, opexCategories, hasExpenses }: Props
             <tr>
               <th style={{ ...labelThStyle, minWidth: 200 }}>Line Item</th>
               {months.map(m => (
-                <th key={m.month} style={thStyle}>{m.month}</th>
+                <th key={m.month} style={thStyle}>
+                {fmtMonthHeader(m.month)}
+              </th>
               ))}
               <th style={thStyle}>Total</th>
             </tr>

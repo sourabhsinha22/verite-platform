@@ -17,13 +17,15 @@ function fmtFull(n: number) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
+const _MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function fmtMonth(m: string | null) {
   if (!m) return '—'
-  return new Date(m + '-02').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  const [y, mo] = m.split('-')
+  return `${_MO[parseInt(mo)-1]} ${y}`
 }
-
 function fmtMonthShort(m: string) {
-  return new Date(m + '-02').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+  const [y, mo] = m.split('-')
+  return `${_MO[parseInt(mo)-1]} '${y.slice(2)}`
 }
 
 function roundUpNice(n: number): number {
@@ -408,8 +410,10 @@ export default async function FinancePage({
 
     const opexCatSet = new Set<string>()
     for (const e of expenses) {
-      const catType = EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES]
-      if (catType === 'opex') opexCatSet.add(e.category)
+      const normalizedCat = e.category.replace(/ - /g, ' — ')
+      const catType = EXPENSE_CATEGORIES[normalizedCat as keyof typeof EXPENSE_CATEGORIES]
+        || EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES]
+      if (catType === 'opex') opexCatSet.add(normalizedCat)
     }
     const opexCategories = Array.from(opexCatSet).sort()
 
@@ -424,15 +428,18 @@ export default async function FinancePage({
       const opex_by_cat_actual: Record<string, number> = {}
 
       for (const e of expRows) {
-        const catType = EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES]
+        // Normalize hyphens to em dashes for category lookup (DB may store either)
+        const normalizedCat = e.category.replace(/ - /g, ' — ')
+        const catType = EXPENSE_CATEGORIES[normalizedCat as keyof typeof EXPENSE_CATEGORIES]
+          || EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES]
         if (catType === 'cogs') {
           cogs_forecast += e.forecast || 0
           cogs_actual += e.actual || 0
         } else if (catType === 'opex') {
           opex_forecast += e.forecast || 0
           opex_actual += e.actual || 0
-          opex_by_cat_forecast[e.category] = (opex_by_cat_forecast[e.category] ?? 0) + (e.forecast || 0)
-          opex_by_cat_actual[e.category] = (opex_by_cat_actual[e.category] ?? 0) + (e.actual || 0)
+          opex_by_cat_forecast[normalizedCat] = (opex_by_cat_forecast[normalizedCat] ?? 0) + (e.forecast || 0)
+          opex_by_cat_actual[normalizedCat] = (opex_by_cat_actual[normalizedCat] ?? 0) + (e.actual || 0)
         }
       }
 

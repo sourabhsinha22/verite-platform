@@ -24,8 +24,10 @@ export default async function PnLPage() {
   // Determine opex categories that have data
   const opexCatSet = new Set<string>()
   for (const e of expenses) {
-    const catType = EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES]
-    if (catType === 'opex') opexCatSet.add(e.category)
+    const norm = e.category.replace(/ - /g, ' — ')
+    const catType = EXPENSE_CATEGORIES[norm as keyof typeof EXPENSE_CATEGORIES]
+      || EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES]
+    if (catType === 'opex') opexCatSet.add(norm)
   }
   const opexCategories = Array.from(opexCatSet).sort()
 
@@ -41,15 +43,17 @@ export default async function PnLPage() {
     const opex_by_cat_actual: Record<string, number> = {}
 
     for (const e of expRows) {
-      const catType = EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES]
+      const norm = e.category.replace(/ - /g, ' — ')
+      const catType = EXPENSE_CATEGORIES[norm as keyof typeof EXPENSE_CATEGORIES]
+        || EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES]
       if (catType === 'cogs') {
         cogs_forecast += e.forecast || 0
         cogs_actual += e.actual || 0
       } else if (catType === 'opex') {
         opex_forecast += e.forecast || 0
         opex_actual += e.actual || 0
-        opex_by_cat_forecast[e.category] = (opex_by_cat_forecast[e.category] ?? 0) + (e.forecast || 0)
-        opex_by_cat_actual[e.category] = (opex_by_cat_actual[e.category] ?? 0) + (e.actual || 0)
+        opex_by_cat_forecast[norm] = (opex_by_cat_forecast[norm] ?? 0) + (e.forecast || 0)
+        opex_by_cat_actual[norm] = (opex_by_cat_actual[norm] ?? 0) + (e.actual || 0)
       }
     }
 

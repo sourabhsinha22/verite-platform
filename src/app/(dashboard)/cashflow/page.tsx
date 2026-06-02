@@ -12,12 +12,14 @@ function fmtFull(n: number) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
+const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function fmtMonth(m: string) {
-  return new Date(m + '-02').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  const [y, mo] = m.split('-')
+  return `${MO[parseInt(mo)-1]} ${y}`
 }
-
 function fmtMonthShort(m: string) {
-  return new Date(m + '-02').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+  const [y, mo] = m.split('-')
+  return `${MO[parseInt(mo)-1]} '${y.slice(2)}`
 }
 
 function roundUpNice(n: number): number {
@@ -42,17 +44,33 @@ export default async function CashFlowPage() {
   rows.forEach(r => { if (r.month) monthSet.add(r.month) })
   const months = Array.from(monthSet).sort()
 
-  // Build engagement list
+  // Build engagement list — dedupe short names by prefixing client initials when collision
   type EngInfo = { id: string; name: string; shortName: string }
   const engMap = new Map<string, EngInfo>()
+  const shortNameCount: Record<string, number> = {}
   rows.forEach(r => {
     const eng = r.engagement as { id: string; name: string } | null
     if (!eng || engMap.has(eng.id)) return
     const parts = eng.name.split(' — ')
-    const shortName = parts.length > 1 ? parts.slice(1).join(' — ') : eng.name
-    engMap.set(eng.id, { id: eng.id, name: eng.name, shortName: shortName.length > 22 ? shortName.slice(0, 21) + '…' : shortName })
+    const rawShort = parts.length > 1 ? parts.slice(1).join(' — ') : eng.name
+    shortNameCount[rawShort] = (shortNameCount[rawShort] ?? 0) + 1
+    const clientPrefix = parts.length > 1 ? parts[0].split(' ').map(w => w[0]).join('').slice(0, 3) : ''
+    const shortName = shortNameCount[rawShort] > 0 && clientPrefix
+      ? `${clientPrefix}: ${rawShort}`.slice(0, 22)
+      : rawShort.length > 22 ? rawShort.slice(0, 21) + '…' : rawShort
+    engMap.set(eng.id, { id: eng.id, name: eng.name, shortName })
   })
-  const engagements = Array.from(engMap.values())
+  // Re-pass to apply prefix for ALL with duplicate short names
+  const shortNames = Array.from(engMap.values()).map(e => {
+    const parts = e.name.split(' — ')
+    const rawShort = parts.length > 1 ? parts.slice(1).join(' — ') : e.name
+    if ((shortNameCount[rawShort] ?? 0) > 1 && parts.length > 1) {
+      const prefix = parts[0].split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase()
+      e.shortName = `${prefix}: ${rawShort}`.slice(0, 22)
+    }
+    return e
+  })
+  const engagements = shortNames
 
   // Matrix: month → engId → { forecast, actual }
   type Cell = { forecast: number; actual: number | null }
