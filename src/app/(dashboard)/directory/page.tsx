@@ -24,7 +24,7 @@ export default async function DirectoryPage() {
             Directory
           </h1>
           <p style={{ color: 'var(--ink-soft)', marginTop: 8, marginBottom: 0 }}>
-            {rows.length} {rows.length === 1 ? 'company' : 'companies'} &middot; click a row for contacts and engagements
+            {rows.length} {rows.length === 1 ? 'company' : 'companies'} &nbsp;&middot;&nbsp; click a row for contacts and engagements
           </p>
         </div>
         <NewCompanyButton />

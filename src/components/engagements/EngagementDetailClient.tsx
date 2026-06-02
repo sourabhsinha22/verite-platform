@@ -208,19 +208,23 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
         background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
         overflow: 'hidden', marginBottom: 32,
       }}>
-        {[
-          { label: 'Lead', field: 'lead' as keyof Engagement },
-          { label: 'Start Date', field: 'start_date' as keyof Engagement },
-        ].map(({ label, field }) => (
-          <div key={field} style={{ padding: '16px 20px', borderRight: '1px solid var(--line-soft)' }}>
-            <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>{label}</div>
-            <input
-              defaultValue={(eng[field] as string | number) ?? ''}
-              onBlur={e => saveEng(field, e.target.value)}
-              style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--navy)', border: 'none', background: 'transparent', width: '100%', padding: 0, outline: 'none' }}
-            />
-          </div>
-        ))}
+        <div style={{ padding: '16px 20px', borderRight: '1px solid var(--line-soft)' }}>
+          <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Lead</div>
+          <input
+            defaultValue={eng.lead ?? ''}
+            onBlur={e => saveEng('lead', e.target.value)}
+            style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--navy)', border: 'none', background: 'transparent', width: '100%', padding: 0, outline: 'none' }}
+          />
+        </div>
+        <div style={{ padding: '16px 20px', borderRight: '1px solid var(--line-soft)' }}>
+          <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Start Date</div>
+          <input
+            type="date"
+            defaultValue={eng.start_date ?? ''}
+            onBlur={e => saveEng('start_date', e.target.value)}
+            style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--navy)', border: 'none', background: 'transparent', width: '100%', padding: 0, outline: 'none', cursor: 'pointer' }}
+          />
+        </div>
         {/* Real task progress */}
         <div style={{ padding: '16px 20px', borderRight: '1px solid var(--line-soft)' }}>
           <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 8 }}>Progress</div>
@@ -312,7 +316,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
                         <input
                           defaultValue={task.owner ?? ''}
                           onBlur={e => updateTask(task, 'owner', e.target.value)}
-                          style={{ ...inputStyle, width: 100 }}
+                          style={{ ...inputStyle, width: 140 }}
                           placeholder="Owner"
                           onFocus={e => Object.assign(e.target.style, { border: '1px solid var(--line)', background: 'var(--bg)' })}
                           onBlurCapture={e => Object.assign(e.target.style, { border: '1px solid transparent', background: 'transparent' })}
