@@ -3,7 +3,9 @@
 // Set env var: RESEND_API_KEY=re_...
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
-const FROM_EMAIL = 'notifications@veritehealth.com'
+// Use onboarding@resend.dev until veritehealth.com domain is verified in Resend
+// To verify: go to resend.com/domains, add veritehealth.com, then change this back
+const FROM_EMAIL = 'onboarding@resend.dev'
 const FROM_NAME = 'Vérité Health Collective'
 
 export async function sendEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
