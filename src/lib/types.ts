@@ -100,6 +100,80 @@ export interface Engagement {
   invoices?: Invoice[]
 }
 
+export interface BankBalance {
+  id: string
+  balance: number
+  as_of_date: string
+  notes: string
+  created_at: string
+}
+
+export interface Distribution {
+  id: string
+  recipient: string
+  amount: number
+  date: string
+  notes: string
+  created_at: string
+}
+
+export interface Contractor {
+  id: string
+  name: string
+  role: string
+  email: string
+  phone: string
+  w9_on_file: boolean
+  notes: string
+  created_at: string
+}
+
+export interface ContractorPayment {
+  id: string
+  contractor_id: string
+  amount: number
+  date: string
+  description: string
+  created_at: string
+}
+
+export interface Reimbursement {
+  id: string
+  date: string
+  client: string
+  description: string
+  amount_out: number
+  amount_in: number
+  status: 'pending' | 'partial' | 'received'
+  notes: string
+  created_at: string
+}
+
+export interface Expense {
+  id: string
+  month: string
+  category: string
+  description: string
+  forecast: number
+  actual: number | null
+  created_at: string
+}
+
+export const EXPENSE_CATEGORIES = {
+  'COGS — Direct staffing': 'cogs',
+  'COGS — Operator costs': 'cogs',
+  'COGS — Contractors (billable)': 'cogs',
+  'OpEx — Payroll & benefits': 'opex',
+  'OpEx — Contractors': 'opex',
+  'OpEx — Software & subscriptions': 'opex',
+  'OpEx — Marketing & sales': 'opex',
+  'OpEx — Rent & facilities': 'opex',
+  'OpEx — Travel': 'opex',
+  'OpEx — Professional services': 'opex',
+  'OpEx — Insurance': 'opex',
+  'OpEx — Other': 'opex',
+} as const
+
 export type ActivityEntryType = 'note' | 'call' | 'meeting' | 'email' | 'status' | 'milestone'
 
 export interface ActivityEntry {

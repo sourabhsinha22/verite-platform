@@ -1,4 +1,4 @@
-﻿﻿export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
@@ -15,7 +15,7 @@ function fmtFull(n: number) {
 }
 
 function fmtMonth(m: string | null) {
-  if (!m) return 'â€"'
+  if (!m) return '—'
   return new Date(m + '-02').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
@@ -45,7 +45,7 @@ export default async function RevenuePage() {
       byEngagement[eng.id] = {
         engagementId: eng.id,
         engagementName: eng.name,
-        companyName: eng.company?.name ?? 'â€"',
+        companyName: eng.company?.name ?? '—',
         companyId: eng.company?.id ?? '',
         rows: [],
       }
@@ -53,15 +53,101 @@ export default async function RevenuePage() {
     byEngagement[eng.id].rows.push(item)
   }
 
+  // Year-over-Year grouping
+  const yoyMap: Record<number, { forecast: number; actual: number }> = {}
+  for (const item of rows) {
+    if (!item.month) continue
+    const year = parseInt(item.month.slice(0, 4))
+    if (!yoyMap[year]) yoyMap[year] = { forecast: 0, actual: 0 }
+    yoyMap[year].forecast += item.forecast_amount ?? 0
+    yoyMap[year].actual += item.actual_amount ?? 0
+  }
+  const yoyYears = Object.keys(yoyMap).map(Number).sort()
+  const yoyMax = Math.max(...yoyYears.map(y => Math.max(yoyMap[y].forecast, yoyMap[y].actual)), 1)
+
   return (
     <div>
       <style>{`.hover-row { cursor: pointer; transition: background 0.1s; } .hover-row:hover { background: var(--line-soft) !important; }`}</style>
       <h1 style={{ fontFamily: 'var(--serif)', fontSize: 42, fontWeight: 600, color: 'var(--navy)', letterSpacing: '-0.5px', margin: '0 0 8px' }}>
         Revenue
       </h1>
-      <p style={{ color: 'var(--ink-soft)', margin: '0 0 36px' }}>
+      <p style={{ color: 'var(--ink-soft)', margin: '0 0 28px' }}>
         Forecast vs. actuals across all engagements
       </p>
+
+      {/* Year over Year */}
+      {yoyYears.length > 0 && (
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 600, color: 'var(--navy)', margin: '0 0 18px' }}>Year over Year</h2>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '24px 28px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {yoyYears.map(year => {
+                const { forecast, actual } = yoyMap[year]
+                const forecastW = Math.round((forecast / yoyMax) * 100)
+                const actualW = Math.round((actual / yoyMax) * 100)
+                return (
+                  <div key={year}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy)', width: 48, flexShrink: 0 }}>{year}</span>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {/* Forecast bar */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: `${forecastW}%`, height: 12, background: 'var(--blush)', borderRadius: 3, transition: 'width 0.3s', minWidth: forecast > 0 ? 4 : 0 }} />
+                          <span style={{ fontSize: 11, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{fmtFull(forecast)} forecast</span>
+                        </div>
+                        {/* Actual bar */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: `${actualW}%`, height: 12, background: 'var(--navy)', borderRadius: 3, transition: 'width 0.3s', minWidth: actual > 0 ? 4 : 0 }} />
+                          <span style={{ fontSize: 11, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{fmtFull(actual)} actual</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {/* Legend */}
+            <div style={{ display: 'flex', gap: 20, marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 14, height: 10, background: 'var(--blush)', borderRadius: 2 }} />
+                <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Forecast</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 14, height: 10, background: 'var(--navy)', borderRadius: 2 }} />
+                <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Actual</span>
+              </div>
+            </div>
+          </div>
+          {/* YoY table */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--line-soft)', borderBottom: '1px solid var(--line)' }}>
+                  {['Year', 'Forecast', 'Actual', 'Collected %'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '9px 16px', fontSize: 10, color: 'var(--wine)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {yoyYears.map(year => {
+                  const { forecast, actual } = yoyMap[year]
+                  const pct = forecast > 0 ? Math.round((actual / forecast) * 100) : 0
+                  return (
+                    <tr key={year} style={{ borderBottom: '1px solid var(--line-soft)' }}>
+                      <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>{year}</td>
+                      <td style={{ padding: '11px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>{fmtFull(forecast)}</td>
+                      <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 500, color: actual > 0 ? 'var(--success)' : 'var(--ink-faint)' }}>{actual > 0 ? fmtFull(actual) : '—'}</td>
+                      <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 600, color: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warn)' : 'var(--danger)' }}>
+                        {forecast > 0 ? `${pct}%` : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 40 }}>
         <StatCard label="Total Forecast" value={fmt(totalForecast)} sub={`${rows.length} line items`} accent="info" />
@@ -88,9 +174,9 @@ export default async function RevenuePage() {
                     <Link href={`/engagements/${group.engagementId}`} style={{ fontFamily: 'var(--serif)', fontSize: 17, fontWeight: 600, color: 'var(--navy)', textDecoration: 'none' }}>
                       {group.engagementName}
                     </Link>
-                    {group.companyName !== 'â€"' && (
+                    {group.companyName !== '—' && (
                       <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
-                        â€" {group.companyName}
+                        — {group.companyName}
                       </span>
                     )}
                   </div>
@@ -120,10 +206,10 @@ export default async function RevenuePage() {
                           <td style={{ padding: '11px 16px', fontSize: 13, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{fmtMonth(item.month)}</td>
                           <td style={{ padding: '11px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>{fmtFull(item.forecast_amount)}</td>
                           <td style={{ padding: '11px 16px', fontSize: 13, color: hasActual ? 'var(--success)' : 'var(--ink-faint)', fontWeight: hasActual ? 500 : 400 }}>
-                            {hasActual ? fmtFull(item.actual_amount!) : 'â€"'}
+                            {hasActual ? fmtFull(item.actual_amount!) : '—'}
                           </td>
                           <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 500, color: !hasActual ? 'var(--ink-faint)' : v >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                            {hasActual ? (v >= 0 ? '+' : '') + fmtFull(v) : 'â€"'}
+                            {hasActual ? (v >= 0 ? '+' : '') + fmtFull(v) : '—'}
                           </td>
                           <td style={{ padding: '11px 16px' }}>
                             {hasActual ? (
