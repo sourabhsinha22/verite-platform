@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
   FileText, Settings, LogOut, TrendingUp, FileCheck, Bell,
-  Kanban, BarChart2, Building, Users, ArrowLeftRight, UserCheck, Activity
+  Kanban, BarChart2, Building, Users, ArrowLeftRight, UserCheck, Activity, Receipt
 } from 'lucide-react'
 
 const navItems = [
@@ -16,7 +16,8 @@ const navItems = [
   { href: '/pipeline',    label: 'Pipeline',     icon: Kanban },
   { href: '/forecast',    label: 'Forecast',     icon: BarChart2 },
   { href: '/revenue',     label: 'Revenue',      icon: TrendingUp },
-  { href: '/cashflow',    label: 'Cash Flow',    icon: Activity },
+  { href: '/pnl',        label: 'P&L',          icon: Receipt },
+  { href: '/cashflow',   label: 'Cash Flow',    icon: Activity },
   { href: '/bank',        label: 'Bank Balance', icon: Building },
   { href: '/distributions', label: 'Distributions', icon: Users },
   { href: '/reimbursements', label: 'Reimbursements', icon: ArrowLeftRight },

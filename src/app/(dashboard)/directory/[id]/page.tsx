@@ -3,9 +3,10 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Company, Contact, Engagement, EngagementType, EngagementStage } from '@/lib/types'
+import { Company, Contact, Engagement, EngagementType, EngagementStage, Document } from '@/lib/types'
 import Badge from '@/components/ui/Badge'
 import CompanyDetailClient from '@/components/directory/CompanyDetailClient'
+import DocumentsSection from '@/components/documents/DocumentsSection'
 import { ChevronLeft } from 'lucide-react'
 
 interface Props {
@@ -16,11 +17,14 @@ export default async function CompanyDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: company }, { data: contacts }, { data: engagements }, { data: allTasks }] = await Promise.all([
+  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: company }, { data: contacts }, { data: engagements }, { data: allTasks }, { data: documents }, { data: teamMember }] = await Promise.all([
     supabase.from('companies').select('*').eq('id', id).single(),
     supabase.from('contacts').select('*').eq('company_id', id).order('is_primary', { ascending: false }),
     supabase.from('engagements').select('*').eq('company_id', id).order('created_at', { ascending: false }),
     supabase.from('tasks').select('engagement_id, status'),
+    supabase.from('documents').select('*').eq('company_id', id).order('created_at', { ascending: false }),
+    user ? supabase.from('team_members').select('name').eq('auth_user_id', user.id).single() : Promise.resolve({ data: null }),
   ])
 
   if (!company) notFound()
@@ -28,6 +32,8 @@ export default async function CompanyDetailPage({ params }: Props) {
   const co = company as Company
   const ctcs = (contacts ?? []) as Contact[]
   const engs = (engagements ?? []) as Engagement[]
+  const docList = (documents ?? []) as Document[]
+  const currentUserName = (teamMember as { name: string } | null)?.name ?? ''
 
   // Task progress per engagement
   const progressMap: Record<string, number> = {}
@@ -109,6 +115,8 @@ export default async function CompanyDetailPage({ params }: Props) {
           </div>
         )}
       </div>
+
+      <DocumentsSection companyId={id} currentUserName={currentUserName} initialDocuments={docList} />
     </div>
   )
 }

@@ -159,6 +159,43 @@ export interface Expense {
   created_at: string
 }
 
+export interface Document {
+  id: string
+  engagement_id: string | null
+  company_id: string | null
+  name: string
+  file_path: string
+  file_size: number | null
+  file_type: string | null
+  uploaded_by: string
+  created_at: string
+}
+
+export type HealthStatus = 'green' | 'yellow' | 'red'
+
+export interface HealthFactors {
+  blockedTasks: number
+  overdueTasks: number
+  daysSinceActivity: number | null
+  overdueInvoiceAging: number   // max days overdue on any invoice
+  sowExpiryDays: number | null  // days until SOW/engagement end, null if no end date
+}
+
+export function computeHealth(factors: HealthFactors): HealthStatus {
+  const { blockedTasks, overdueTasks, daysSinceActivity, overdueInvoiceAging, sowExpiryDays } = factors
+  // Red conditions
+  if (blockedTasks > 0) return 'red'
+  if (overdueInvoiceAging > 30) return 'red'
+  if (sowExpiryDays !== null && sowExpiryDays <= 14) return 'red'
+  if (daysSinceActivity !== null && daysSinceActivity >= 21) return 'red'
+  // Yellow conditions
+  if (overdueTasks > 0) return 'yellow'
+  if (overdueInvoiceAging > 0) return 'yellow'
+  if (sowExpiryDays !== null && sowExpiryDays <= 30) return 'yellow'
+  if (daysSinceActivity !== null && daysSinceActivity >= 14) return 'yellow'
+  return 'green'
+}
+
 export const EXPENSE_CATEGORIES = {
   'COGS — Direct staffing': 'cogs',
   'COGS — Operator costs': 'cogs',

@@ -4,8 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ChevronLeft, FileText } from 'lucide-react'
-import { Engagement, Task, RevenueItem, ActivityEntry } from '@/lib/types'
+import { Engagement, Task, RevenueItem, ActivityEntry, Document } from '@/lib/types'
 import EngagementDetailClient from '@/components/engagements/EngagementDetailClient'
+import DocumentsSection from '@/components/documents/DocumentsSection'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -15,12 +16,15 @@ export default async function EngagementDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: engagement }, { data: tasks }, { data: revenueItems }, { data: sows }, { data: activityLog }] = await Promise.all([
+  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: engagement }, { data: tasks }, { data: revenueItems }, { data: sows }, { data: activityLog }, { data: documents }, { data: teamMember }] = await Promise.all([
     supabase.from('engagements').select('*, company:companies(id, name)').eq('id', id).single(),
     supabase.from('tasks').select('*').eq('engagement_id', id).order('sort_order'),
     supabase.from('revenue_items').select('*').eq('engagement_id', id).order('sort_order'),
     supabase.from('sows').select('id, title, status, version').eq('engagement_id', id).order('created_at', { ascending: false }).limit(1),
     supabase.from('activity_log').select('*').eq('engagement_id', id).order('created_at', { ascending: false }).limit(50),
+    supabase.from('documents').select('*').eq('engagement_id', id).order('created_at', { ascending: false }),
+    user ? supabase.from('team_members').select('name').eq('auth_user_id', user.id).single() : Promise.resolve({ data: null }),
   ])
 
   if (!engagement) notFound()
@@ -30,6 +34,8 @@ export default async function EngagementDetailPage({ params }: Props) {
   const revenue = (revenueItems ?? []) as RevenueItem[]
   const latestSow = sows?.[0] ?? null
   const log = (activityLog ?? []) as ActivityEntry[]
+  const docList = (documents ?? []) as Document[]
+  const currentUserName = (teamMember as { name: string } | null)?.name ?? ''
 
   return (
     <div>
@@ -65,6 +71,7 @@ export default async function EngagementDetailPage({ params }: Props) {
       </div>
 
       <EngagementDetailClient engagement={eng} tasks={taskList} revenueItems={revenue} activityLog={log} />
+      <DocumentsSection engagementId={id} currentUserName={currentUserName} initialDocuments={docList} />
     </div>
   )
 }

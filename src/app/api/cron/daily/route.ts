@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendEmail, invoiceOverdueEmail } from '@/lib/email'
 import { verifyCronSecret, fmtDate, fmt, addMonths, todayStr, inNDays, alreadyNotified, logNotification } from '@/lib/cron'
+import { computeHealth } from '@/lib/types'
 
 export async function GET(request: Request) {
   if (!verifyCronSecret(request)) {
@@ -206,6 +207,80 @@ export async function GET(request: Request) {
       totalActions++
     }
   }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 5. HEALTH SCORE RECALCULATION
+  // ─────────────────────────────────────────────────────────────────────
+  const { data: healthEngs } = await supabase
+    .from('engagements')
+    .select('id, end_date')
+    .eq('stage', 'active')
+
+  let healthUpdated = 0
+  for (const eng of healthEngs ?? []) {
+    // 1. Count blocked tasks
+    const { count: blockedCount } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('engagement_id', eng.id)
+      .eq('status', 'blocked')
+
+    // 2. Count overdue tasks
+    const { count: overdueCount } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('engagement_id', eng.id)
+      .neq('status', 'done')
+      .lt('due_date', today)
+
+    // 3. Days since last activity_log entry
+    const { data: lastActivity } = await supabase
+      .from('activity_log')
+      .select('created_at')
+      .eq('engagement_id', eng.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    let daysSinceActivity: number | null = null
+    if (lastActivity && lastActivity.length > 0) {
+      daysSinceActivity = Math.floor((Date.now() - new Date(lastActivity[0].created_at).getTime()) / 86400000)
+    }
+
+    // 4. Max overdue invoice aging
+    const { data: overdueInvoices } = await supabase
+      .from('invoices')
+      .select('due_date')
+      .eq('engagement_id', eng.id)
+      .is('paid_date', null)
+      .lt('due_date', today)
+
+    let overdueInvoiceAging = 0
+    for (const inv of overdueInvoices ?? []) {
+      const aging = Math.floor((Date.now() - new Date(inv.due_date).getTime()) / 86400000)
+      if (aging > overdueInvoiceAging) overdueInvoiceAging = aging
+    }
+
+    // 5. SOW expiry days
+    let sowExpiryDays: number | null = null
+    if (eng.end_date) {
+      sowExpiryDays = Math.floor((new Date(eng.end_date).getTime() - Date.now()) / 86400000)
+    }
+
+    // 6. Compute health
+    const health = computeHealth({
+      blockedTasks: blockedCount ?? 0,
+      overdueTasks: overdueCount ?? 0,
+      daysSinceActivity,
+      overdueInvoiceAging,
+      sowExpiryDays,
+    })
+
+    // 7. Update engagement health
+    await supabase.from('engagements').update({ health }).eq('id', eng.id)
+    healthUpdated++
+  }
+
+  results.push(`Health updated for ${healthUpdated} engagements`)
 
   // Log the run
   await supabase.from('cron_log').insert({

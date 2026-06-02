@@ -14,12 +14,13 @@ interface EngRow extends Omit<Engagement, 'company'> {
 interface Props {
   engagements: EngRow[]
   progressMap: Record<string, number>
+  healthMap?: Record<string, string>
 }
 
 const STAGES: (EngagementStage | 'all')[] = ['all', 'lead', 'opportunity', 'active', 'paused', 'closed']
 const STAGE_CHIP_LABEL: Record<string, string> = { all: 'All', ...ENGAGEMENT_STAGE_LABELS }
 
-export default function EngagementsClient({ engagements, progressMap }: Props) {
+export default function EngagementsClient({ engagements, progressMap, healthMap = {} }: Props) {
   const [stage, setStage] = useState<EngagementStage | 'all'>('all')
   const [showModal, setShowModal] = useState(false)
   const router = useRouter()
@@ -71,7 +72,7 @@ export default function EngagementsClient({ engagements, progressMap }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--line-soft)', borderBottom: '1px solid var(--line)' }}>
-                {['Engagement', 'Type', 'Stage', 'Lead', 'Started', 'Progress'].map(h => (
+                {['Health', 'Engagement', 'Type', 'Stage', 'Lead', 'Started', 'Progress'].map(h => (
                   <th key={h} style={{
                     textAlign: 'left', padding: '12px 16px', fontSize: 10,
                     color: 'var(--wine)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600,
@@ -87,6 +88,12 @@ export default function EngagementsClient({ engagements, progressMap }: Props) {
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--line-soft)')}
                   onMouseLeave={e => (e.currentTarget.style.background = '')}
                 >
+                  <td style={{ padding: '14px 16px', width: 32 }}>
+                    <span style={{
+                      display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+                      background: healthMap[eng.id] === 'red' ? 'var(--danger)' : healthMap[eng.id] === 'yellow' ? 'var(--warn)' : 'var(--success)',
+                    }} />
+                  </td>
                   <td style={{ padding: '14px 16px', fontSize: 13 }}>
                     <Link href={`/engagements/${eng.id}`} style={{ fontWeight: 500, color: 'var(--navy)', textDecoration: 'none', display: 'block' }}>
                       {eng.name}

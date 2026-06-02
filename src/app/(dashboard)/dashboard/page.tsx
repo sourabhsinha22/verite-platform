@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import StatCard from '@/components/ui/StatCard'
 import Badge from '@/components/ui/Badge'
-import { Engagement, Task, EngagementStage, EngagementType } from '@/lib/types'
+import { Engagement, Task, EngagementStage, EngagementType, HealthStatus } from '@/lib/types'
 import { AlertCircle, Clock, ArrowRight } from 'lucide-react'
 
 function fmt(n: number) {
@@ -50,6 +50,13 @@ export default async function DashboardPage() {
     tasksByEng[t.engagement_id].push(t)
   })
 
+  // Health summary counts
+  const healthCounts = { green: 0, yellow: 0, red: 0 }
+  for (const eng of activeEngs) {
+    const h = (eng.health as HealthStatus) || 'green'
+    healthCounts[h]++
+  }
+
   return (
     <div>
       <style>{`
@@ -70,6 +77,27 @@ export default async function DashboardPage() {
         <StatCard label="Total Forecast" value={fmt(totalForecast)} accent="info" />
         <StatCard label="Actual Received" value={fmt(totalActual)} accent="green" />
       </div>
+
+      {/* Health summary row */}
+      {activeEngs.length > 0 && (
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+          <div style={{ background: 'var(--danger-soft)', borderRadius: '8px', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--danger)', display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--danger)' }}>{healthCounts.red}</span>
+            <span style={{ fontSize: '12px', color: 'var(--danger)', fontWeight: 500 }}>At Risk</span>
+          </div>
+          <div style={{ background: 'var(--warn-soft)', borderRadius: '8px', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--warn)', display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--warn)' }}>{healthCounts.yellow}</span>
+            <span style={{ fontSize: '12px', color: 'var(--warn)', fontWeight: 500 }}>Needs Attention</span>
+          </div>
+          <div style={{ background: 'var(--success-soft)', borderRadius: '8px', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--success)' }}>{healthCounts.green}</span>
+            <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: 500 }}>On Track</span>
+          </div>
+        </div>
+      )}
 
       {/* Alerts row */}
       {(overdueTasks.length > 0 || blockedTasks.length > 0) && (
@@ -116,7 +144,7 @@ export default async function DashboardPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--line-soft)', borderBottom: '1px solid var(--line)' }}>
-              {['Engagement', 'Type', 'Lead', 'Progress', 'Stage'].map(h => (
+              {['', 'Engagement', 'Type', 'Lead', 'Progress', 'Stage'].map(h => (
                 <th key={h} style={{ textAlign: 'left', fontSize: '10px', color: 'var(--wine)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600, padding: '12px 16px' }}>{h}</th>
               ))}
             </tr>
@@ -127,6 +155,12 @@ export default async function DashboardPage() {
               const progress = calcProgress(engTasks)
               return (
                 <tr key={eng.id} className="dash-row" style={{ borderBottom: '1px solid var(--line-soft)' }}>
+                  <td style={{ padding: '14px 8px 14px 16px', width: '20px' }}>
+                    <span style={{
+                      width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block',
+                      background: eng.health === 'red' ? 'var(--danger)' : eng.health === 'yellow' ? 'var(--warn)' : 'var(--success)',
+                    }} />
+                  </td>
                   <td style={{ padding: '14px 16px' }}>
                     <Link href={`/engagements/${eng.id}`} style={{ textDecoration: 'none' }}>
                       <div style={{ fontWeight: 500, color: 'var(--ink)', fontSize: '13px' }}>{eng.name}</div>
