@@ -115,7 +115,12 @@ export default function InvoicesClient({ invoices }: Props) {
                     onMouseEnter={e => (e.currentTarget.style.background = status === 'overdue' ? 'var(--danger-soft)' : 'var(--line-soft)')}
                     onMouseLeave={e => (e.currentTarget.style.background = status === 'overdue' ? '#fff8f8' : '')}
                   >
-                    <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>{inv.invoice_number}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>
+                      {inv.invoice_number}
+                      {(inv as InvoiceRow & { is_recurring?: boolean }).is_recurring && (
+                        <span style={{ marginLeft: 6, fontSize: 9, background: 'var(--info-bg, #e6f1fb)', color: '#185FA5', padding: '1px 5px', borderRadius: 3, fontWeight: 600, verticalAlign: 'middle' }}>RECURRING</span>
+                      )}
+                    </td>
                     <td style={{ padding: '13px 16px', fontSize: 13 }}>{inv.company?.name || '—'}</td>
                     <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--ink-soft)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.engagement?.name || '—'}</td>
                     <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>{fmt(inv.amount)}</td>
@@ -150,6 +155,7 @@ function NewInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [form, setForm] = useState({
     invoice_number: '', engagement_id: '', company_id: '',
     amount: '', date_sent: new Date().toISOString().slice(0, 10), due_date: '', notes: '',
+    is_recurring: false, billing_frequency: 'monthly', next_billing_date: '', recurring_end_date: '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -172,13 +178,18 @@ function NewInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreate
     setError('')
     setSaving(true)
     const { error: err } = await supabase.from('invoices').insert({
-      ...form,
       invoice_number: form.invoice_number.trim(),
       amount: parseFloat(form.amount),
+      date_sent: form.date_sent || null,
+      due_date: form.due_date || null,
       status: form.date_sent ? 'sent' : 'draft',
       engagement_id: form.engagement_id || null,
       company_id: form.company_id || null,
-      due_date: form.due_date || null,
+      notes: form.notes || '',
+      is_recurring: form.is_recurring,
+      billing_frequency: form.is_recurring ? form.billing_frequency : null,
+      next_billing_date: form.is_recurring && form.next_billing_date ? form.next_billing_date : null,
+      recurring_end_date: form.is_recurring && form.recurring_end_date ? form.recurring_end_date : null,
     })
     setSaving(false)
     if (err) { setError(err.message); return }
@@ -243,7 +254,35 @@ function NewInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </div>
           <div>
             <label style={labelStyle}>Notes</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--sans)' }} placeholder="Optional notes…" />
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--sans)' }} placeholder="Optional notes…" />
+          </div>
+
+          {/* Recurring toggle */}
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--navy)', fontWeight: 500 }}>
+              <input type="checkbox" checked={form.is_recurring} onChange={e => setForm(f => ({ ...f, is_recurring: e.target.checked }))} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              Set as recurring invoice
+            </label>
+            {form.is_recurring && (
+              <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Frequency</label>
+                  <select value={form.billing_frequency} onChange={e => setForm(f => ({ ...f, billing_frequency: e.target.value }))} style={inputStyle}>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="annually">Annually</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Next billing date</label>
+                  <input type="date" value={form.next_billing_date} onChange={e => setForm(f => ({ ...f, next_billing_date: e.target.value }))} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>End date (optional)</label>
+                  <input type="date" value={form.recurring_end_date} onChange={e => setForm(f => ({ ...f, recurring_end_date: e.target.value }))} style={inputStyle} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
