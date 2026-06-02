@@ -69,12 +69,43 @@ These were discussed but not yet prioritized. Need Tana's input on which to buil
 16. **Audit log** — every data change logged with who/when. Required for compliance-conscious buyers.
 17. **Zapier/Make integration** — webhooks to connect with Google Sheets, Slack, etc.
 18. **Stripe subscription billing** — free trial → paid plans for multi-tenant launch.
+19. **QuickBooks Online integration** — see notes below.
 
 ### Priority ranking for Vérité specifically
-1. Recurring invoices (saves 2+ hrs/month immediately)
+1. ✅ Recurring invoices
 2. Client portal (biggest credibility upgrade)
-3. Document management (consolidates scattered files)
-4. Weekly digest email (replaces manual status checking)
+3. ✅ Document management
+4. ✅ Weekly digest email
 5. Mobile responsive (needed for on-site visits)
 6. Time tracking (justifies rates, feeds invoicing)
-7. Health scoring (prevents client relationship surprises)
+7. ✅ Health scoring
+
+---
+
+## QuickBooks Online Integration — Notes (discuss with Tana)
+
+**Feasibility:** Yes, possible. QuickBooks Online has a full REST API with OAuth 2.0.
+**Requires QBO (cloud)** — not compatible with QuickBooks Desktop.
+
+### Source of truth split (recommended approach):
+- **Vérité owns:** Engagements, invoices, clients
+- **QuickBooks owns:** Expenses, payments, bank transactions
+
+### What would sync:
+- Vérité → QBO: Invoices created, invoice paid status, new customers
+- QBO → Vérité: Expenses (populate P&L COGS/OpEx rows), payments received (auto-mark invoice paid + update revenue actuals), bank transactions (feed bank balance ledger)
+
+### The big win:
+Enter data once. Bookkeeper stays in QuickBooks. Vérité P&L shows real costs automatically.
+
+### Build steps when ready:
+1. Register at developer.intuit.com (free), create an app — 30 min
+2. Get OAuth client ID + secret, add to Vercel env vars
+3. Build "Connect to QuickBooks" OAuth flow (Settings page)
+4. Store tokens in Supabase (new `integrations` table)
+5. Build sync routes: `/api/sync/qbo` — daily cron + manual "Sync Now" button
+6. Map QBO chart of accounts → Vérité expense categories (user-configurable)
+7. Test on QBO sandbox before touching real books
+
+### Estimated effort: 1–2 weeks
+### Priority: Phase 3 — build when daily double-entry friction becomes painful
