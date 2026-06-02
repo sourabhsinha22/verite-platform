@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
@@ -72,6 +72,19 @@ export default function Sidebar({ currentUser }: Props) {
       return { work: true, clients: true, finance: false }
     }
   })
+
+  // Auto-expand Finance group when navigating to finance/money routes
+  useEffect(() => {
+    const financeRoutes = ['/finance', '/money', '/invoices', '/revenue', '/pnl', '/cashflow', '/forecast', '/bank', '/distributions', '/reimbursements', '/contractors']
+    if (financeRoutes.some(r => pathname.startsWith(r))) {
+      setOpenGroups(prev => {
+        if (prev.finance) return prev
+        const next = { ...prev, finance: true }
+        try { localStorage.setItem('verite-sidebar-groups', JSON.stringify(next)) } catch {}
+        return next
+      })
+    }
+  }, [pathname])
 
   const toggleGroup = (id: string) => {
     setOpenGroups(prev => {

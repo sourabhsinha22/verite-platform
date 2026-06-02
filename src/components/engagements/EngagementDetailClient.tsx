@@ -218,11 +218,16 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
         </div>
         <div style={{ padding: '16px 20px', borderRight: '1px solid var(--line-soft)' }}>
           <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Start Date</div>
+          <div style={{ fontSize: 14, color: 'var(--navy)', fontWeight: 500 }}>
+            {eng.start_date
+              ? new Date(eng.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : <span style={{ color: 'var(--ink-faint)' }}>—</span>}
+          </div>
           <input
             type="date"
             defaultValue={eng.start_date ?? ''}
             onBlur={e => saveEng('start_date', e.target.value)}
-            style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--navy)', border: 'none', background: 'transparent', width: '100%', padding: 0, outline: 'none', cursor: 'pointer' }}
+            style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--ink-faint)', border: 'none', background: 'transparent', width: '100%', padding: '2px 0 0', outline: 'none', cursor: 'pointer' }}
           />
         </div>
         {/* Real task progress */}
