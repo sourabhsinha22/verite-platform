@@ -5,6 +5,7 @@ import { Engagement, Task, ActivityEntryType, ENGAGEMENT_TYPE_LABELS, ENGAGEMENT
 import PrintButton from '@/components/reports/PrintButton'
 import ReportFilters from '@/components/reports/ReportFilters'
 import PreparedFor from '@/components/reports/PreparedFor'
+import ReportNav from '@/components/reports/ReportNav'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -194,6 +195,8 @@ export default async function ReportsPage({
 
   return (
     <>
+      <ReportNav active="status" />
+
       {/* ── Print styles ────────────────────────────────────────────────────── */}
       <style>{`
         @media print {
