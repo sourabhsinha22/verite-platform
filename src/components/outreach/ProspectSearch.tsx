@@ -139,7 +139,9 @@ export default function ProspectSearch({ sequences, teamMembers: _teamMembers }:
       const data = await resp.json()
       if (!resp.ok) {
         const errMsg = data.error ?? 'Search failed'
-        if (errMsg.toLowerCase().includes('not connected') || errMsg.toLowerCase().includes('api key')) {
+        if (data.plan_upgrade_required) {
+          setError('plan_upgrade')
+        } else if (errMsg.toLowerCase().includes('not connected') || errMsg.toLowerCase().includes('api key')) {
           setError('not_connected')
         } else {
           setError(errMsg)
@@ -387,7 +389,15 @@ export default function ProspectSearch({ sequences, teamMembers: _teamMembers }:
         </div>
       )}
 
-      {error && error !== 'not_connected' && (
+      {error === 'plan_upgrade' && (
+        <div style={{ background: 'var(--warn-soft)', border: '1px solid #f0d8a0', borderRadius: 8, padding: '16px 20px', fontSize: 13, color: 'var(--warn)' }}>
+          <strong>Apollo Professional required</strong> — People search isn&apos;t available on the free plan.{' '}
+          Upgrade at <a href="https://app.apollo.io" target="_blank" rel="noreferrer" style={{ color: 'var(--wine)', fontWeight: 600 }}>app.apollo.io</a> to unlock prospect search ($79/user/mo).
+          Once upgraded, this page will work immediately — no other changes needed.
+        </div>
+      )}
+
+      {error && error !== 'not_connected' && error !== 'plan_upgrade' && (
         <div style={{
           background: '#fef2f2',
           border: '1px solid #fca5a5',

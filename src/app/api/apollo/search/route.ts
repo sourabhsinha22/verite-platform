@@ -14,6 +14,12 @@ export async function POST(request: Request) {
   })
 
   const data = await resp.json()
-  if (!resp.ok) return NextResponse.json({ error: data.message ?? 'Apollo search failed', details: data }, { status: resp.status })
+  if (!resp.ok) {
+    const isPlanError = data.error_code === 'API_INACCESSIBLE' || (data.error ?? '').includes('free plan')
+    const message = isPlanError
+      ? 'People search requires Apollo Professional ($79/mo). Upgrade at app.apollo.io to unlock search.'
+      : (data.error ?? data.message ?? 'Apollo search failed')
+    return NextResponse.json({ error: message, plan_upgrade_required: isPlanError, details: data }, { status: resp.status })
+  }
   return NextResponse.json(data)
 }
