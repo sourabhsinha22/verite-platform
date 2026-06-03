@@ -95,10 +95,9 @@ export async function POST(req: NextRequest) {
     .insert({
       provider: 'apollo',
       event_type: eventType,
-      contact_name: contactName,
-      contact_email: contactEmail,
-      raw_payload: payload ?? { raw: rawBody, parse_error: parseError },
-      result: parseError ? 'parse_error' : null,
+      payload: payload ?? { raw: rawBody, parse_error: parseError },
+      processed: false,
+      result: parseError ? 'parse_error' : '',
     })
     .select('id')
     .single()
@@ -179,11 +178,14 @@ export async function POST(req: NextRequest) {
           stage: newStage,
           source: 'apollo_sequence',
           source_detail: sequenceName ?? sequenceId ?? null,
-          apollo_contact_id: apolloContactId,
-          apollo_sequence_id: sequenceId,
+          apollo_contact_id: apolloContactId ?? '',
+          apollo_sequence_id: sequenceId ?? '',
+          apollo_sequence_name: sequenceName ?? '',
           company_id: companyId,
           health: 'green',
           probability: newStage === 'qualified' ? 35 : 15,
+          prospect_email: contactEmail ?? '',
+          prospect_title: contact?.title ?? '',
         })
         .select('id')
         .single()
