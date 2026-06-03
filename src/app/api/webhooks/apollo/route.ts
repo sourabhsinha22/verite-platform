@@ -29,7 +29,33 @@ export async function POST(req: NextRequest) {
   let parseError: string | null = null
 
   try {
-    payload = JSON.parse(rawBody) as ApolloPayload
+    const raw = JSON.parse(rawBody)
+
+    // Detect Zapier format — Zapier sends flat fields, not nested Apollo structure
+    // We accept either native Apollo format OR the Zapier-mapped format below
+    if (raw.zapier_source === 'true' || raw.contact_email) {
+      // Zapier flat format: { contact_email, contact_name, contact_title,
+      //   company_name, sequence_name, sequence_id, event_type }
+      payload = {
+        event_type: raw.event_type ?? 'emailer_campaign.contact_replied',
+        data: {
+          contact: {
+            id: raw.contact_id ?? '',
+            first_name: (raw.contact_name ?? '').split(' ')[0] ?? '',
+            last_name: (raw.contact_name ?? '').split(' ').slice(1).join(' ') ?? '',
+            email: raw.contact_email ?? '',
+            title: raw.contact_title ?? '',
+            organization_name: raw.company_name ?? '',
+          },
+          emailer_campaign: {
+            id: raw.sequence_id ?? '',
+            name: raw.sequence_name ?? 'Zapier',
+          },
+        },
+      }
+    } else {
+      payload = raw as ApolloPayload
+    }
   } catch (e) {
     parseError = e instanceof Error ? e.message : 'JSON parse error'
   }
