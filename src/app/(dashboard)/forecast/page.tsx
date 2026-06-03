@@ -14,7 +14,7 @@ function fmtMoneyFull(v: number): string {
 }
 
 const STAGE_PROBABILITY: Record<EngagementStage, number> = {
-  lead: 10, opportunity: 30, active: 80, paused: 40, closed: 0,
+  prospect: 5, engaged: 15, qualified: 35, proposal_sent: 60, lead: 10, opportunity: 30, active: 80, paused: 40, closed: 0,
 }
 
 export default async function ForecastPage() {
@@ -87,6 +87,10 @@ export default async function ForecastPage() {
   }
 
   const stageColors: Record<EngagementStage, string> = {
+    prospect: 'var(--indigo)',
+    engaged: 'var(--blush)',
+    qualified: 'var(--warn)',
+    proposal_sent: 'var(--mauve)',
     lead: 'var(--blush)',
     opportunity: 'var(--warn)',
     active: 'var(--success)',

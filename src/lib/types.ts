@@ -1,6 +1,7 @@
 export type CompanyTag = 'current' | 'prospect' | 'past'
 export type EngagementType = 'opportunity' | 'project-based' | 'sales-growth' | 'care-model'
-export type EngagementStage = 'lead' | 'opportunity' | 'active' | 'paused' | 'closed'
+export type EngagementStage = 'prospect' | 'engaged' | 'qualified' | 'proposal_sent' | 'lead' | 'opportunity' | 'active' | 'paused' | 'closed'
+export type OutreachSource = 'apollo_sequence' | 'conference' | 'inbound' | 'referral' | 'founder_network' | 'unknown'
 export type TaskStatus = 'not-started' | 'in-progress' | 'blocked' | 'done'
 export type RevenueType = 'retainer' | 'revenue-share' | 'project' | 'hourly'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
@@ -93,6 +94,10 @@ export interface Engagement {
   probability: number | null
   expected_close_date: string | null
   pipeline_notes: string
+  source: OutreachSource | null
+  source_detail: string | null
+  apollo_contact_id: string | null
+  apollo_sequence_id: string | null
   created_at: string
   company?: Company
   tasks?: Task[]
@@ -335,11 +340,24 @@ export const ENGAGEMENT_TYPE_LABELS: Record<EngagementType, string> = {
 }
 
 export const ENGAGEMENT_STAGE_LABELS: Record<EngagementStage, string> = {
+  prospect: 'Prospect',
+  engaged: 'Engaged',
+  qualified: 'Qualified',
+  proposal_sent: 'Proposal Sent',
   lead: 'Lead',
   opportunity: 'Opportunity',
   active: 'Active',
   paused: 'Paused',
   closed: 'Closed',
+}
+
+export const OUTREACH_SOURCE_LABELS: Record<OutreachSource, string> = {
+  apollo_sequence: 'Apollo Sequence',
+  conference: 'Conference',
+  inbound: 'Inbound',
+  referral: 'Referral',
+  founder_network: 'Founder Network',
+  unknown: 'Unknown',
 }
 
 export const COMPANY_TAG_LABELS: Record<CompanyTag, string> = {

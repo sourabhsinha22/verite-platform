@@ -7,6 +7,7 @@ import {
   Engagement, Task, RevenueItem, TaskStatus, EngagementStage,
   TASK_STATUS_LABELS, ENGAGEMENT_STAGE_LABELS, ENGAGEMENT_TYPE_LABELS,
   ActivityEntry, ActivityEntryType, ACTIVITY_TYPE_LABELS,
+  OUTREACH_SOURCE_LABELS, OutreachSource,
 } from '@/lib/types'
 import Badge from '@/components/ui/Badge'
 import { Trash2, Plus } from 'lucide-react'
@@ -41,10 +42,15 @@ function fmtCurrency(n: number) {
   return `$${n.toLocaleString()}`
 }
 
+const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
 function fmtDateTime(iso: string) {
   const d = new Date(iso)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
-    ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  const h = d.getHours()
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const hour = h % 12 || 12
+  return `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} at ${hour}:${min} ${ampm}`
 }
 
 const ENTRY_TYPE_COLORS: Record<ActivityEntryType, string> = {
@@ -204,7 +210,9 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
 
       {/* Detail row */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0,
+        display: 'grid',
+        gridTemplateColumns: eng.source && eng.source !== 'unknown' ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)',
+        gap: 0,
         background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
         overflow: 'hidden', marginBottom: 32,
       }}>
@@ -221,7 +229,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <div style={{ fontSize: 14, color: 'var(--navy)', fontWeight: 500 }}>
               {eng.start_date
-                ? new Date(eng.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                ? (() => { const d = new Date(eng.start_date + 'T00:00:00'); return `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` })()
                 : <span style={{ color: 'var(--ink-faint)' }}>Not set</span>}
             </div>
             {/* Invisible date input overlaid on the formatted text for click-to-edit */}
@@ -247,7 +255,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
             }} />
           </div>
         </div>
-        <div style={{ padding: '16px 20px' }}>
+        <div style={{ padding: '16px 20px', borderRight: eng.source && eng.source !== 'unknown' ? '1px solid var(--line-soft)' : undefined }}>
           <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Health</div>
           <select
             value={eng.health}
@@ -263,6 +271,17 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
             <option value="red">🔴 Red</option>
           </select>
         </div>
+        {eng.source && eng.source !== 'unknown' && (
+          <div style={{ padding: '16px 20px' }}>
+            <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Source</div>
+            <div style={{ fontSize: 13, color: 'var(--navy)' }}>
+              {OUTREACH_SOURCE_LABELS[eng.source as OutreachSource]}
+            </div>
+            {eng.source_detail && (
+              <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2 }}>{eng.source_detail}</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Task Sections */}

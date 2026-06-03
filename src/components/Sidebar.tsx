@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
   FileText, Settings, LogOut, TrendingUp, FileCheck,
-  Kanban, Building,
+  Kanban, Building, Plug,
 } from 'lucide-react'
 
 const NAV_GROUPS = [
@@ -43,8 +43,9 @@ const NAV_GROUPS = [
 ]
 
 const STANDALONE = [
-  { href: '/reports',  label: 'Reports',  icon: FileText },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/reports',               label: 'Reports',      icon: FileText },
+  { href: '/settings',              label: 'Settings',     icon: Settings },
+  { href: '/settings/integrations', label: 'Integrations', icon: Plug },
 ]
 
 interface CurrentUser {

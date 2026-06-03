@@ -22,9 +22,13 @@ interface Props {
   teamMembers: { id: string; name: string }[]
 }
 
-const STAGE_ORDER: EngagementStage[] = ['lead', 'opportunity', 'active', 'paused', 'closed']
+const STAGE_ORDER: EngagementStage[] = ['prospect', 'engaged', 'qualified', 'proposal_sent', 'active', 'paused', 'closed']
 
 const STAGE_PROBABILITY: Record<EngagementStage, number> = {
+  prospect: 5,
+  engaged: 15,
+  qualified: 35,
+  proposal_sent: 60,
   lead: 10,
   opportunity: 30,
   active: 80,
@@ -33,6 +37,10 @@ const STAGE_PROBABILITY: Record<EngagementStage, number> = {
 }
 
 const STAGE_ACCENT: Record<EngagementStage, string> = {
+  prospect: 'var(--ink-faint)',
+  engaged: 'var(--blush)',
+  qualified: 'var(--warn)',
+  proposal_sent: 'var(--mauve)',
   lead: 'var(--blush)',
   opportunity: 'var(--warn)',
   active: 'var(--success)',
@@ -46,9 +54,12 @@ function fmtMoney(v: number): string {
   return `$${Math.round(v).toLocaleString()}`
 }
 
+const MO_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
 function fmtDate(d: string | null | undefined): string {
   if (!d) return ''
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const dt = new Date(d)
+  return `${MO_SHORT[dt.getMonth()]} ${dt.getDate()}`
 }
 
 function getInitials(name: string): string {

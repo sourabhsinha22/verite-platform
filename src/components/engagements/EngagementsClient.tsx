@@ -17,7 +17,10 @@ interface Props {
   healthMap?: Record<string, string>
 }
 
-const STAGES: (EngagementStage | 'all')[] = ['all', 'lead', 'opportunity', 'active', 'paused', 'closed']
+const STAGES: (EngagementStage | 'all')[] = [
+  'all', 'prospect', 'engaged', 'qualified', 'proposal_sent',
+  'lead', 'opportunity', 'active', 'paused', 'closed',
+]
 const STAGE_CHIP_LABEL: Record<string, string> = { all: 'All', ...ENGAGEMENT_STAGE_LABELS }
 
 export default function EngagementsClient({ engagements, progressMap, healthMap = {} }: Props) {
@@ -109,7 +112,11 @@ export default function EngagementsClient({ engagements, progressMap, healthMap 
                   <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--ink-soft)' }}>{eng.lead || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>
                     {eng.start_date
-                      ? new Date(eng.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      ? (() => {
+                          const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                          const d = new Date(eng.start_date + 'T00:00:00')
+                          return `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+                        })()
                       : '—'}
                   </td>
                   <td style={{ padding: '14px 16px', minWidth: 120 }}>

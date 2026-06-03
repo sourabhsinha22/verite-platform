@@ -10,11 +10,15 @@ const TYPE_STYLES: Record<EngagementType, { bg: string; color: string }> = {
 }
 
 const STAGE_STYLES: Record<EngagementStage, { bg: string; color: string }> = {
-  lead:        { bg: '#f3e4dc', color: 'var(--wine)' },
-  opportunity: { bg: '#d8dde8', color: 'var(--navy)' },
-  active:      { bg: 'var(--success-soft)', color: 'var(--success)' },
-  paused:      { bg: 'var(--warn-soft)', color: 'var(--warn)' },
-  closed:      { bg: '#ece3dd', color: '#6b5b50' },
+  prospect:      { bg: '#e8eaf2', color: 'var(--indigo)' },
+  engaged:       { bg: '#f3e4dc', color: 'var(--wine)' },
+  qualified:     { bg: 'var(--warn-soft)', color: 'var(--warn)' },
+  proposal_sent: { bg: '#ead9cd', color: 'var(--wine)' },
+  lead:          { bg: '#f3e4dc', color: 'var(--wine)' },
+  opportunity:   { bg: '#d8dde8', color: 'var(--navy)' },
+  active:        { bg: 'var(--success-soft)', color: 'var(--success)' },
+  paused:        { bg: 'var(--warn-soft)', color: 'var(--warn)' },
+  closed:        { bg: '#ece3dd', color: '#6b5b50' },
 }
 
 const TAG_STYLES: Record<CompanyTag, { bg: string; color: string }> = {
