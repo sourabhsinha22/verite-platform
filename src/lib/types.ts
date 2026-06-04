@@ -94,6 +94,12 @@ export interface Engagement {
   probability: number | null
   expected_close_date: string | null
   pipeline_notes: string
+  next_action: string
+  next_action_date: string | null
+  win_loss_category: string | null
+  win_loss_reason: string
+  outcomes: Record<string, unknown>
+  stage_history: Record<string, string>
   source: OutreachSource | null
   source_detail: string | null
   apollo_contact_id: string | null
@@ -328,8 +334,33 @@ export interface TeamMember {
   name: string
   email: string
   role: string
+  calendly_url: string
   avatar_url: string | null
 }
+
+export const WIN_LOSS_LABELS: Record<string, string> = {
+  won: 'Won',
+  price: 'Price — too expensive',
+  timing: 'Timing — not ready yet',
+  competitor: 'Chose a competitor',
+  baa_required: 'HIPAA BAA required (not yet live)',
+  no_budget: 'No budget approved',
+  wrong_fit: 'Wrong fit / not our ICP',
+  champion_left: 'Champion left the org',
+  no_response: 'No response after follow-up',
+}
+
+// NouvelleED onboarding task template — fires automatically on deal close
+export const NOUVELLEED_ONBOARDING_TASKS = [
+  'Setup call booked with client team',
+  'Org configured in NouvelleED platform',
+  'White-labeling + branding applied',
+  'First competency module built (AI Competency Studio demo)',
+  'Team training session scheduled',
+  'ANCC CE certificate test completed',
+  'Affinity CE certificates verified working',
+  'Case study discussion scheduled (Day 30)',
+]
 
 // UI helpers
 export const ENGAGEMENT_TYPE_LABELS: Record<EngagementType, string> = {

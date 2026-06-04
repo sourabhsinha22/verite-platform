@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
   FileText, Settings, LogOut, TrendingUp, FileCheck,
-  Kanban, Building, Plug, Search,
+  Kanban, Building, Plug, Search, Gauge,
 } from 'lucide-react'
 
 const NAV_GROUPS = [
@@ -20,6 +20,7 @@ const NAV_GROUPS = [
       { href: '/tasks',       label: 'My Tasks',    icon: CheckSquare },
       { href: '/engagements', label: 'Engagements', icon: Briefcase },
       { href: '/pipeline',    label: 'Pipeline',    icon: Kanban },
+      { href: '/velocity',   label: 'Velocity',   icon: Gauge },
       { href: '/outreach',   label: 'Outreach',   icon: Search },
     ],
   },

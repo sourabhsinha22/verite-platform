@@ -13,7 +13,7 @@ function fmtWeighted(value: number): string {
 export default async function PipelinePage() {
   const supabase = await createClient()
 
-  const [{ data: engagements }, { data: teamMembers }] = await Promise.all([
+  const [{ data: engagements }, { data: teamMembers }, { data: teamMembersCalendly }] = await Promise.all([
     supabase
       .from('engagements')
       .select('*, company:companies(id, name), tasks(*)')
@@ -22,7 +22,15 @@ export default async function PipelinePage() {
       .from('team_members')
       .select('id, name')
       .order('name'),
+    supabase
+      .from('team_members')
+      .select('name, calendly_url'),
   ])
+
+  const calendlyMap: Record<string, string> = {}
+  ;(teamMembersCalendly ?? []).forEach((m: { name: string; calendly_url: string | null }) => {
+    if (m.calendly_url) calendlyMap[m.name] = m.calendly_url
+  })
 
   type RawEngagement = Engagement & {
     company?: { id: string; name: string }
@@ -70,6 +78,7 @@ export default async function PipelinePage() {
       <PipelineClient
         engagements={engagementCards}
         teamMembers={teamMembers ?? []}
+        calendlyMap={calendlyMap}
       />
     </div>
   )

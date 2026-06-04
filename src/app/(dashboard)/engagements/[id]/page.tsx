@@ -37,6 +37,12 @@ export default async function EngagementDetailPage({ params }: Props) {
   const docList = (documents ?? []) as Document[]
   const currentUserName = (teamMember as { name: string } | null)?.name ?? ''
 
+  // Fetch lead's Calendly URL
+  const { data: leadMember } = eng.lead
+    ? await supabase.from('team_members').select('calendly_url').eq('name', eng.lead).single()
+    : { data: null }
+  const leadCalendlyUrl = (leadMember as { calendly_url?: string } | null)?.calendly_url ?? ''
+
   return (
     <div>
       {/* Back + breadcrumbs */}
@@ -70,7 +76,7 @@ export default async function EngagementDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <EngagementDetailClient engagement={eng} tasks={taskList} revenueItems={revenue} activityLog={log} />
+      <EngagementDetailClient engagement={eng} tasks={taskList} revenueItems={revenue} activityLog={log} leadCalendlyUrl={leadCalendlyUrl} />
       <DocumentsSection engagementId={id} currentUserName={currentUserName} initialDocuments={docList} />
     </div>
   )

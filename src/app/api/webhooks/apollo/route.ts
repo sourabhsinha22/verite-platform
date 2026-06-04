@@ -233,6 +233,44 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // ── Instant lead alert email ──────────────────────────────────────────────
+    if (isReplied || isClicked || isMeeting) {
+      const { data: teamMembers } = await supabase.from('team_members').select('name, email')
+      const allEmails = (teamMembers ?? []).map((m: { email: string }) => m.email).filter(Boolean)
+      if (allEmails.length > 0) {
+        const stage = isMeeting ? 'Qualified' : 'Engaged'
+        const { sendEmail } = await import('@/lib/email')
+        await sendEmail({
+          to: allEmails[0],
+          subject: `New ${stage} lead: ${contactName ?? contactEmail ?? 'Unknown'} — ${companyName ?? ''}`,
+          html: `
+            <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; color: #25314a;">
+              <div style="border-bottom: 2px solid #5f3e3f; padding-bottom: 12px; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 22px;">New ${stage} Lead</h2>
+                <p style="margin: 4px 0 0; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #5f3e3f;">
+                  ${isMeeting ? 'Meeting Booked' : 'Replied to Sequence'}
+                </p>
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <tr><td style="padding: 8px 0; color: #5f5f6e; width: 120px;">Name</td><td style="padding: 8px 0; font-weight: 600;">${contactName ?? '—'}</td></tr>
+                <tr><td style="padding: 8px 0; color: #5f5f6e;">Title</td><td style="padding: 8px 0;">${contact?.title ?? '—'}</td></tr>
+                <tr><td style="padding: 8px 0; color: #5f5f6e;">Company</td><td style="padding: 8px 0;">${companyName ?? '—'}</td></tr>
+                <tr><td style="padding: 8px 0; color: #5f5f6e;">Email</td><td style="padding: 8px 0;">${contactEmail ?? '—'}</td></tr>
+                <tr><td style="padding: 8px 0; color: #5f5f6e;">Sequence</td><td style="padding: 8px 0;">${sequenceName ?? '—'}</td></tr>
+              </table>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://verite-platform.vercel.app'}/pipeline"
+                 style="display: inline-block; background: #5f3e3f; color: #fff; padding: 11px 22px; border-radius: 4px; text-decoration: none; font-size: 14px; margin-top: 20px;">
+                View in Pipeline →
+              </a>
+              <p style="margin-top: 28px; font-size: 11px; color: #9a9aa5;">
+                Vérité Health Collective · Automated lead alert
+              </p>
+            </div>
+          `
+        })
+      }
+    }
+
     // ── Update webhook_events result ──────────────────────────────────────────
     if (webhookEvent?.id) {
       await supabase.from('webhook_events').update({ result: 'ok' }).eq('id', webhookEvent.id)

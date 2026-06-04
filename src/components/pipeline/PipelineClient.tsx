@@ -20,6 +20,7 @@ interface EngagementCard extends Omit<Engagement, 'company'> {
 interface Props {
   engagements: EngagementCard[]
   teamMembers: { id: string; name: string }[]
+  calendlyMap?: Record<string, string>
 }
 
 const STAGE_ORDER: EngagementStage[] = ['prospect', 'engaged', 'qualified', 'proposal_sent', 'active', 'paused', 'closed']
@@ -256,9 +257,10 @@ interface CardProps {
   card: EngagementCard
   dimmed: boolean
   onDragStart: (id: string) => void
+  calendlyUrl?: string
 }
 
-function KanbanCard({ card, dimmed, onDragStart }: CardProps) {
+function KanbanCard({ card, dimmed, onDragStart, calendlyUrl }: CardProps) {
   const accent = STAGE_ACCENT[card.stage]
   const isClosedStage = card.stage === 'closed' || card.stage === 'paused'
 
@@ -348,13 +350,41 @@ function KanbanCard({ card, dimmed, onDragStart }: CardProps) {
           </span>
         )}
       </div>
+      {/* Calendly book call */}
+      {calendlyUrl && (
+        <div style={{ marginTop: 8, borderTop: '1px solid var(--line-soft)', paddingTop: 7 }}>
+          <a
+            href={calendlyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="kanban-book-call"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 11,
+              color: 'var(--ink-faint)',
+              background: 'none',
+              border: '1px solid var(--line)',
+              borderRadius: 3,
+              padding: '3px 8px',
+              textDecoration: 'none',
+              fontFamily: 'var(--sans)',
+              cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+          >
+            📅 Book call
+          </a>
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function PipelineClient({ engagements, teamMembers }: Props) {
+export default function PipelineClient({ engagements, teamMembers, calendlyMap = {} }: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [cards, setCards] = useState<EngagementCard[]>(engagements)
@@ -405,6 +435,7 @@ export default function PipelineClient({ engagements, teamMembers }: Props) {
         .pipeline-col.drag-over { background: var(--line-soft) !important; }
         .add-col-btn:hover { background: rgba(95,62,63,0.08) !important; color: var(--wine) !important; }
         .owner-chip:hover { background: var(--line) !important; }
+        .kanban-book-call:hover { background: var(--line-soft) !important; }
       `}</style>
 
       {/* Owner filter bar */}
@@ -501,6 +532,7 @@ export default function PipelineClient({ engagements, teamMembers }: Props) {
                     card={card}
                     dimmed={ownerFilter !== null && card.lead !== ownerFilter}
                     onDragStart={handleDragStart}
+                    calendlyUrl={card.lead ? calendlyMap[card.lead] : undefined}
                   />
                 ))}
 

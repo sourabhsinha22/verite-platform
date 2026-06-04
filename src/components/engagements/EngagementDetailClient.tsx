@@ -8,6 +8,7 @@ import {
   TASK_STATUS_LABELS, ENGAGEMENT_STAGE_LABELS, ENGAGEMENT_TYPE_LABELS,
   ActivityEntry, ActivityEntryType, ACTIVITY_TYPE_LABELS,
   OUTREACH_SOURCE_LABELS, OutreachSource,
+  WIN_LOSS_LABELS, NOUVELLEED_ONBOARDING_TASKS,
 } from '@/lib/types'
 import Badge from '@/components/ui/Badge'
 import { Trash2, Plus } from 'lucide-react'
@@ -17,6 +18,7 @@ interface Props {
   tasks: Task[]
   revenueItems: RevenueItem[]
   activityLog: ActivityEntry[]
+  leadCalendlyUrl?: string
 }
 
 const inputStyle: React.CSSProperties = {
@@ -53,6 +55,18 @@ function fmtDateTime(iso: string) {
   return `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} at ${hour}:${min} ${ampm}`
 }
 
+function fmtDateShort(iso: string) {
+  const d = new Date(iso + 'T00:00:00')
+  return `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+}
+
+function daysDiff(dateStr: string): number {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const target = new Date(dateStr + 'T00:00:00')
+  return Math.round((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+}
+
 const ENTRY_TYPE_COLORS: Record<ActivityEntryType, string> = {
   note: 'var(--navy)',
   call: 'var(--success)',
@@ -73,7 +87,7 @@ const ENTRY_TYPE_PLACEHOLDERS: Record<ActivityEntryType, string> = {
 
 const ENTRY_TYPES: ActivityEntryType[] = ['note', 'call', 'meeting', 'email', 'status', 'milestone']
 
-export default function EngagementDetailClient({ engagement: initialEng, tasks: initialTasks, revenueItems: initialRevenue, activityLog: initialLog }: Props) {
+export default function EngagementDetailClient({ engagement: initialEng, tasks: initialTasks, revenueItems: initialRevenue, activityLog: initialLog, leadCalendlyUrl }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -89,7 +103,13 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
   const [newEntryContent, setNewEntryContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const saveEng = async (field: keyof Engagement, value: string | number) => {
+  // Win/loss form state
+  const [showWinLossForm, setShowWinLossForm] = useState(false)
+  const [winLossCategory, setWinLossCategory] = useState(eng.win_loss_category ?? '')
+  const [winLossReason, setWinLossReason] = useState(eng.win_loss_reason ?? '')
+
+  const saveEng = async (field: keyof Engagement, value: string | number | null | Record<string, unknown>) => {
+    setEng(prev => ({ ...prev, [field]: value }))
     await supabase.from('engagements').update({ [field]: value }).eq('id', eng.id)
     setSaveMsg('Saved')
     setTimeout(() => setSaveMsg(''), 2000)
@@ -168,11 +188,71 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
     setSubmitting(false)
   }
 
+  const handleStageChange = async (newStage: EngagementStage) => {
+    const prevStage = eng.stage
+    setEng(prev => ({ ...prev, stage: newStage }))
+    await supabase.from('engagements').update({ stage: newStage }).eq('id', eng.id)
+    setSaveMsg('Saved')
+    setTimeout(() => setSaveMsg(''), 2000)
+
+    // Stage velocity tracking
+    const now = new Date().toISOString().slice(0, 10)
+    const updatedHistory = { ...(eng.stage_history ?? {}), [newStage]: now }
+    setEng(prev => ({ ...prev, stage_history: updatedHistory }))
+    await supabase.from('engagements').update({ stage_history: updatedHistory }).eq('id', eng.id)
+
+    // Win/loss capture
+    if (newStage === 'closed') {
+      setShowWinLossForm(true)
+    }
+
+    // Auto onboarding tasks when going active
+    if (newStage === 'active' && (prevStage === 'proposal_sent' || prevStage === 'qualified')) {
+      const onboardingTasks = NOUVELLEED_ONBOARDING_TASKS.map((title, i) => ({
+        engagement_id: eng.id,
+        title,
+        task_group: 'project' as const,
+        status: 'not-started' as const,
+        sort_order: 100 + i,
+      }))
+      const { data: newTasks } = await supabase.from('tasks').insert(onboardingTasks).select()
+      if (newTasks) setTasks(prev => [...prev, ...newTasks])
+    }
+
+    startTransition(() => router.refresh())
+  }
+
+  const saveOutcome = async (field: string, value: unknown) => {
+    const updated = { ...(eng.outcomes ?? {}), [field]: value }
+    setEng(prev => ({ ...prev, outcomes: updated }))
+    await supabase.from('engagements').update({ outcomes: updated }).eq('id', eng.id)
+  }
+
   const salesTasks = tasks.filter(t => t.task_group === 'sales')
   const projectTasks = tasks.filter(t => t.task_group === 'project')
   const customTasks = tasks.filter(t => t.task_group === 'custom')
 
   const typeLabel = ENGAGEMENT_TYPE_LABELS[eng.engagement_type]
+
+  // Next action date helpers
+  const nextActionDays = eng.next_action_date ? daysDiff(eng.next_action_date) : null
+  const nextActionOverdue = nextActionDays !== null && nextActionDays < 0
+  const nextActionBorderColor = (eng.next_action && nextActionOverdue)
+    ? 'var(--warn)'
+    : 'var(--line)'
+  const nextActionBg = (eng.next_action && nextActionOverdue)
+    ? 'var(--warn-soft)'
+    : 'var(--surface)'
+
+  // Outcomes
+  const outcomes = (eng.outcomes ?? {}) as Record<string, unknown>
+
+  const detailColCount = (() => {
+    let count = 4
+    if (eng.source && eng.source !== 'unknown') count++
+    if (leadCalendlyUrl) count++
+    return count
+  })()
 
   return (
     <div>
@@ -197,24 +277,102 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
         <select
           value={eng.stage}
           onChange={async e => {
-            const v = e.target.value as EngagementStage
-            setEng(prev => ({ ...prev, stage: v }))
-            await saveEng('stage', v)
+            await handleStageChange(e.target.value as EngagementStage)
           }}
           style={selectStyle}
         >
           {Object.entries(ENGAGEMENT_STAGE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
+        {eng.next_action && (
+          <span style={{
+            display: 'inline-block',
+            background: 'var(--line-soft)',
+            color: 'var(--ink-soft)',
+            fontSize: 11,
+            padding: '3px 9px',
+            borderRadius: 20,
+            maxWidth: 280,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            → {eng.next_action.length > 40 ? eng.next_action.slice(0, 40) + '…' : eng.next_action}
+          </span>
+        )}
         {saveMsg && <span style={{ fontSize: 11, color: 'var(--success)' }}>{saveMsg}</span>}
       </div>
+
+      {/* Win/Loss form (shown when stage = closed) */}
+      {showWinLossForm && (
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--warn)',
+          borderRadius: 8, padding: '20px 24px', marginBottom: 24,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy)', marginBottom: 12 }}>
+            Why is this deal closing?
+          </div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <select
+              value={winLossCategory}
+              onChange={e => setWinLossCategory(e.target.value)}
+              style={{ ...selectStyle, width: '100%', fontSize: 13, padding: '8px 10px' }}
+            >
+              <option value="">— Select reason —</option>
+              {Object.entries(WIN_LOSS_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+            <textarea
+              value={winLossReason}
+              onChange={e => setWinLossReason(e.target.value)}
+              rows={2}
+              placeholder="Additional notes (optional)"
+              style={{
+                fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ink)',
+                background: 'var(--bg)', border: '1px solid var(--line)',
+                borderRadius: 4, padding: '8px 10px', width: '100%', boxSizing: 'border-box', resize: 'vertical',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={async () => {
+                  await supabase.from('engagements').update({
+                    win_loss_category: winLossCategory || null,
+                    win_loss_reason: winLossReason,
+                  }).eq('id', eng.id)
+                  setEng(prev => ({ ...prev, win_loss_category: winLossCategory || null, win_loss_reason: winLossReason }))
+                  setShowWinLossForm(false)
+                  setSaveMsg('Saved')
+                  setTimeout(() => setSaveMsg(''), 2000)
+                }}
+                style={{
+                  background: 'var(--wine)', color: '#fff', border: 'none',
+                  borderRadius: 4, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                Save & Close
+              </button>
+              <button
+                onClick={() => setShowWinLossForm(false)}
+                style={{
+                  background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--navy)',
+                  borderRadius: 4, padding: '8px 16px', fontSize: 13, cursor: 'pointer',
+                }}
+              >
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detail row */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: eng.source && eng.source !== 'unknown' ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)',
+        gridTemplateColumns: `repeat(${detailColCount}, 1fr)`,
         gap: 0,
         background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
-        overflow: 'hidden', marginBottom: 32,
+        overflow: 'hidden', marginBottom: 24,
       }}>
         <div style={{ padding: '16px 20px', borderRight: '1px solid var(--line-soft)' }}>
           <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Lead</div>
@@ -229,10 +387,9 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <div style={{ fontSize: 14, color: 'var(--navy)', fontWeight: 500 }}>
               {eng.start_date
-                ? (() => { const d = new Date(eng.start_date + 'T00:00:00'); return `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` })()
+                ? fmtDateShort(eng.start_date)
                 : <span style={{ color: 'var(--ink-faint)' }}>Not set</span>}
             </div>
-            {/* Invisible date input overlaid on the formatted text for click-to-edit */}
             <input
               type="date"
               defaultValue={eng.start_date ?? ''}
@@ -255,7 +412,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
             }} />
           </div>
         </div>
-        <div style={{ padding: '16px 20px', borderRight: eng.source && eng.source !== 'unknown' ? '1px solid var(--line-soft)' : undefined }}>
+        <div style={{ padding: '16px 20px', borderRight: (eng.source && eng.source !== 'unknown') || leadCalendlyUrl ? '1px solid var(--line-soft)' : undefined }}>
           <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Health</div>
           <select
             value={eng.health}
@@ -272,7 +429,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
           </select>
         </div>
         {eng.source && eng.source !== 'unknown' && (
-          <div style={{ padding: '16px 20px' }}>
+          <div style={{ padding: '16px 20px', borderRight: leadCalendlyUrl ? '1px solid var(--line-soft)' : undefined }}>
             <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Source</div>
             <div style={{ fontSize: 13, color: 'var(--navy)' }}>
               {OUTREACH_SOURCE_LABELS[eng.source as OutreachSource]}
@@ -282,6 +439,69 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
             )}
           </div>
         )}
+        {leadCalendlyUrl && (
+          <div style={{ padding: '16px 20px' }}>
+            <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Book a Call</div>
+            <a
+              href={leadCalendlyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 13, color: 'var(--wine)', textDecoration: 'none', fontWeight: 500 }}
+            >
+              📅 Schedule with {eng.lead || 'Lead'}
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Next Action Card */}
+      <div style={{
+        background: nextActionBg,
+        border: `1px solid ${nextActionBorderColor}`,
+        borderRadius: 8,
+        padding: '16px 20px',
+        marginBottom: 32,
+      }}>
+        <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 10 }}>Next Action</div>
+        <input
+          key={`na-${eng.id}`}
+          defaultValue={eng.next_action ?? ''}
+          onBlur={e => saveEng('next_action', e.target.value)}
+          placeholder="Book discovery call with Dr. Hayes…"
+          style={{
+            fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--ink)',
+            background: 'var(--bg)', border: '1px solid var(--line)',
+            borderRadius: 4, padding: '8px 12px', width: '100%', boxSizing: 'border-box',
+            marginBottom: 8,
+          }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>Due:</span>
+            <input
+              type="date"
+              key={`nad-${eng.id}`}
+              defaultValue={eng.next_action_date ?? ''}
+              onBlur={e => saveEng('next_action_date', e.target.value || null)}
+              style={{
+                fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ink)',
+                background: 'var(--bg)', border: '1px solid var(--line)',
+                borderRadius: 4, padding: '5px 8px',
+              }}
+            />
+          </div>
+          {eng.next_action_date && (
+            <span style={{
+              fontSize: 12,
+              color: nextActionOverdue ? 'var(--warn)' : 'var(--ink-faint)',
+              fontWeight: nextActionOverdue ? 600 : 400,
+            }}>
+              {nextActionOverdue
+                ? `⚠ overdue by ${Math.abs(nextActionDays!)} day${Math.abs(nextActionDays!) !== 1 ? 's' : ''}`
+                : `due in ${nextActionDays} day${nextActionDays !== 1 ? 's' : ''}`}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Task Sections */}
@@ -589,17 +809,14 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
                 {/* Header row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {/* Colored dot */}
                     <div style={{
                       width: 10, height: 10, borderRadius: '50%',
                       background: ENTRY_TYPE_COLORS[entry.entry_type],
                       flexShrink: 0,
                     }} />
-                    {/* Author */}
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
                       {entry.author}
                     </span>
-                    {/* Type badge */}
                     <span style={{
                       padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600,
                       letterSpacing: '0.08em', textTransform: 'uppercase',
@@ -610,7 +827,6 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
                       {ACTIVITY_TYPE_LABELS[entry.entry_type]}
                     </span>
                   </div>
-                  {/* Date */}
                   <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
                     {fmtDateTime(entry.created_at)}
                   </span>
@@ -624,6 +840,106 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
           </div>
         )}
       </div>
+
+      {/* Outcomes & Case Study Data — only shown for active engagements */}
+      {eng.stage === 'active' && (
+        <div style={{ marginBottom: 40 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <h2 style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 600, color: 'var(--navy)', margin: 0 }}>
+              Outcomes & Case Study Data
+            </h2>
+            {!!(outcomes as Record<string, unknown>).case_study_ready && (
+              <span style={{
+                background: 'var(--success-soft)', color: 'var(--success)',
+                border: '1px solid rgba(45,106,62,0.3)',
+                borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                letterSpacing: '0.08em', textTransform: 'uppercase',
+              }}>
+                Case study ready ✓
+              </span>
+            )}
+          </div>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '20px 24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 20 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>
+                  Hours saved / competency build
+                </label>
+                <input
+                  type="number"
+                  defaultValue={(outcomes.hours_saved as number) ?? ''}
+                  onBlur={e => saveOutcome('hours_saved', e.target.value ? parseFloat(e.target.value) : null)}
+                  placeholder="0"
+                  style={{
+                    fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--ink)',
+                    background: 'var(--bg)', border: '1px solid var(--line)',
+                    borderRadius: 4, padding: '7px 10px', width: '100%', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>
+                  Modules created
+                </label>
+                <input
+                  type="number"
+                  defaultValue={(outcomes.modules_created as number) ?? ''}
+                  onBlur={e => saveOutcome('modules_created', e.target.value ? parseInt(e.target.value) : null)}
+                  placeholder="0"
+                  style={{
+                    fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--ink)',
+                    background: 'var(--bg)', border: '1px solid var(--line)',
+                    borderRadius: 4, padding: '7px 10px', width: '100%', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>
+                  CE certificates issued
+                </label>
+                <input
+                  type="number"
+                  defaultValue={(outcomes.ce_certificates as number) ?? ''}
+                  onBlur={e => saveOutcome('ce_certificates', e.target.value ? parseInt(e.target.value) : null)}
+                  placeholder="0"
+                  style={{
+                    fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--ink)',
+                    background: 'var(--bg)', border: '1px solid var(--line)',
+                    borderRadius: 4, padding: '7px 10px', width: '100%', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={!!outcomes.case_study_ready}
+                  onChange={e => saveOutcome('case_study_ready', e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>Case study ready?</span>
+              </label>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>
+                Outcome notes
+              </label>
+              <textarea
+                defaultValue={(outcomes.notes as string) ?? ''}
+                onBlur={e => saveOutcome('notes', e.target.value)}
+                rows={3}
+                placeholder="Describe key outcomes, wins, or lessons…"
+                style={{
+                  fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ink)',
+                  background: 'var(--bg)', border: '1px solid var(--line)',
+                  borderRadius: 4, padding: '8px 12px', width: '100%', boxSizing: 'border-box', resize: 'vertical',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

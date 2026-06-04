@@ -26,7 +26,7 @@ export default function SettingsClient({ members: initialMembers }: Props) {
   const router = useRouter()
   const [members, setMembers] = useState(initialMembers)
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', role: '' })
+  const [form, setForm] = useState({ name: '', email: '', role: '', calendly_url: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -42,7 +42,7 @@ export default function SettingsClient({ members: initialMembers }: Props) {
     }
     if (data) {
       setMembers(prev => [...prev, data])
-      setForm({ name: '', email: '', role: '' })
+      setForm({ name: '', email: '', role: '', calendly_url: '' })
       setShowAdd(false)
     }
   }
@@ -55,6 +55,12 @@ export default function SettingsClient({ members: initialMembers }: Props) {
       return
     }
     setMembers(prev => prev.filter(m => m.id !== id))
+  }
+
+  const updateCalendly = async (id: string, url: string) => {
+    const trimmed = url.trim()
+    await supabase.from('team_members').update({ calendly_url: trimmed }).eq('id', id)
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, calendly_url: trimmed } : m))
   }
 
   return (
@@ -73,7 +79,7 @@ export default function SettingsClient({ members: initialMembers }: Props) {
 
         {showAdd && (
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', background: '#fffaf7' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={labelStyle}>Name *</label>
                 <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
@@ -86,6 +92,16 @@ export default function SettingsClient({ members: initialMembers }: Props) {
                 <label style={labelStyle}>Role</label>
                 <input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={inputStyle} placeholder="e.g. Analyst" />
               </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Calendly URL (optional)</label>
+              <input
+                value={form.calendly_url}
+                onChange={e => setForm(f => ({ ...f, calendly_url: e.target.value }))}
+                style={inputStyle}
+                placeholder="https://calendly.com/..."
+                type="url"
+              />
             </div>
             {error && (
               <div style={{ marginBottom: 10, padding: '7px 12px', background: 'var(--danger-soft)', borderRadius: 4, color: 'var(--danger)', fontSize: 13 }}>
@@ -109,7 +125,7 @@ export default function SettingsClient({ members: initialMembers }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--line-soft)' }}>
-                {['Name', 'Email', 'Role', ''].map(h => (
+                {['Name', 'Email', 'Role', 'Meeting Link', ''].map(h => (
                   <th key={h} style={{
                     textAlign: 'left', padding: '10px 20px', fontSize: 10,
                     color: 'var(--wine)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600,
@@ -134,6 +150,39 @@ export default function SettingsClient({ members: initialMembers }: Props) {
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--ink-soft)' }}>{m.email}</td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--ink-soft)' }}>{m.role || '—'}</td>
+                  <td style={{ padding: '14px 20px', minWidth: 260 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        defaultValue={m.calendly_url ?? ''}
+                        placeholder="https://calendly.com/..."
+                        type="url"
+                        onBlur={e => updateCalendly(m.id, e.target.value)}
+                        style={{
+                          ...inputStyle,
+                          fontSize: 12,
+                          padding: '5px 8px',
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                      />
+                      {m.calendly_url && (
+                        <a
+                          href={m.calendly_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open Calendly link"
+                          style={{
+                            fontSize: 15,
+                            textDecoration: 'none',
+                            flexShrink: 0,
+                            lineHeight: 1,
+                          }}
+                        >
+                          🔗
+                        </a>
+                      )}
+                    </div>
+                  </td>
                   <td style={{ padding: '14px 20px', width: 40 }}>
                     <button
                       onClick={() => deleteMember(m.id)}
