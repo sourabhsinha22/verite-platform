@@ -1,9 +1,13 @@
 export const dynamic = 'force-dynamic'
 
+import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
+import { getCurrentUser, canAccessFinance } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import StatCard from '@/components/ui/StatCard'
 import PnLClient from '@/components/pnl/PnLClient'
+import YearFilter from '@/components/finance/YearFilter'
 import { Expense, RevenueItem, EXPENSE_CATEGORIES, Engagement, EngagementStage, ENGAGEMENT_STAGE_LABELS } from '@/lib/types'
 
 // ─── shared formatters ───────────────────────────────────────────
@@ -66,20 +70,28 @@ const STAGE_PROBABILITY: Record<EngagementStage, number> = {
 export default async function FinancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; year?: string }>
 }) {
-  const { tab = 'revenue' } = await searchParams
+  const { tab = 'revenue', year } = await searchParams
   const activeTab = TABS.find(t => t.id === tab) ? tab : 'revenue'
+  const selectedYear = year ?? 'all'
+
+  const currentUser = await getCurrentUser()
+  if (!canAccessFinance(currentUser?.role ?? 'Associate')) {
+    redirect('/dashboard')
+  }
 
   const supabase = await createClient()
 
   // ─── Tab bar ──────────────────────────────────────────────────
+  const yearSuffix = selectedYear !== 'all' ? `&year=${selectedYear}` : ''
+
   const tabBar = (
     <div style={{ display: 'flex', gap: 4, marginBottom: 32, background: 'var(--line-soft)', padding: 4, borderRadius: 8, width: 'fit-content' }}>
       {TABS.map(t => (
         <Link
           key={t.id}
-          href={`/finance?tab=${t.id}`}
+          href={`/finance?tab=${t.id}${yearSuffix}`}
           style={{
             padding: '7px 16px',
             borderRadius: 6,
@@ -100,10 +112,14 @@ export default async function FinancePage({
   // TAB: REVENUE
   // ═══════════════════════════════════════════════════════════════
   if (activeTab === 'revenue') {
-    const { data: items } = await supabase
+    let revenueQuery = supabase
       .from('revenue_items')
       .select('*, engagement:engagements(id, name, company:companies(id, name))')
       .order('month', { ascending: true })
+    if (selectedYear !== 'all') {
+      revenueQuery = revenueQuery.gte('month', `${selectedYear}-01`).lte('month', `${selectedYear}-12`)
+    }
+    const { data: items } = await revenueQuery
 
     const rows = items ?? []
 
@@ -160,9 +176,10 @@ export default async function FinancePage({
     return (
       <div>
         <style>{`.hover-row { cursor: pointer; transition: background 0.1s; } .hover-row:hover { background: var(--line-soft) !important; }`}</style>
+        <Suspense fallback={<div style={{ height: 34 }} />}><YearFilter /></Suspense>
         {tabBar}
         <h1 style={{ fontFamily: 'var(--serif)', fontSize: 42, fontWeight: 600, color: 'var(--navy)', letterSpacing: '-0.5px', margin: '0 0 8px' }}>
-          Revenue
+          Revenue{selectedYear !== 'all' ? ` · ${selectedYear}` : ''}
         </h1>
         <p style={{ color: 'var(--ink-soft)', margin: '0 0 28px' }}>Forecast vs. actuals across all engagements</p>
 
@@ -395,9 +412,15 @@ export default async function FinancePage({
   // TAB: P&L
   // ═══════════════════════════════════════════════════════════════
   if (activeTab === 'pnl') {
+    let pnlRevQuery = supabase.from('revenue_items').select('forecast_amount, actual_amount, month')
+    let pnlExpQuery = supabase.from('expenses').select('month, category, forecast, actual')
+    if (selectedYear !== 'all') {
+      pnlRevQuery = pnlRevQuery.gte('month', `${selectedYear}-01`).lte('month', `${selectedYear}-12`)
+      pnlExpQuery = pnlExpQuery.gte('month', `${selectedYear}-01`).lte('month', `${selectedYear}-12`)
+    }
     const [{ data: revenueData }, { data: expenseData }] = await Promise.all([
-      supabase.from('revenue_items').select('forecast_amount, actual_amount, month'),
-      supabase.from('expenses').select('month, category, forecast, actual'),
+      pnlRevQuery,
+      pnlExpQuery,
     ])
 
     const revenue = (revenueData ?? []) as Pick<RevenueItem, 'forecast_amount' | 'actual_amount' | 'month'>[]
@@ -453,9 +476,10 @@ export default async function FinancePage({
 
     return (
       <div>
+        <Suspense fallback={<div style={{ height: 34 }} />}><YearFilter /></Suspense>
         {tabBar}
         <h1 style={{ fontFamily: 'var(--serif)', fontSize: 42, fontWeight: 600, color: 'var(--navy)', marginBottom: 8, letterSpacing: '-0.5px' }}>
-          P&amp;L Statement
+          P&amp;L Statement{selectedYear !== 'all' ? ` · ${selectedYear}` : ''}
         </h1>
         <PnLClient
           months={monthData}
@@ -470,10 +494,14 @@ export default async function FinancePage({
   // TAB: CASH FLOW
   // ═══════════════════════════════════════════════════════════════
   if (activeTab === 'cashflow') {
-    const { data: items } = await supabase
+    let cashflowQuery = supabase
       .from('revenue_items')
       .select('*, engagement:engagements(id, name, company:companies(id, name))')
       .order('month', { ascending: true })
+    if (selectedYear !== 'all') {
+      cashflowQuery = cashflowQuery.gte('month', `${selectedYear}-01`).lte('month', `${selectedYear}-12`)
+    }
+    const { data: items } = await cashflowQuery
 
     const rows = items ?? []
     const currentMonth = new Date().toISOString().slice(0, 7)
@@ -551,9 +579,10 @@ export default async function FinancePage({
 
     return (
       <div>
+        <Suspense fallback={<div style={{ height: 34 }} />}><YearFilter /></Suspense>
         {tabBar}
         <h1 style={{ fontFamily: 'var(--serif)', fontSize: 42, fontWeight: 600, color: 'var(--navy)', letterSpacing: '-0.5px', margin: '0 0 8px' }}>
-          Monthly Cash Flow
+          Monthly Cash Flow{selectedYear !== 'all' ? ` · ${selectedYear}` : ''}
         </h1>
         <p style={{ color: 'var(--ink-soft)', margin: '0 0 32px' }}>Month-by-month Vérité Revenue — forecast vs. actual received</p>
 
@@ -703,15 +732,16 @@ export default async function FinancePage({
   // ═══════════════════════════════════════════════════════════════
   // TAB: FORECAST
   // ═══════════════════════════════════════════════════════════════
+  let forecastRevQuery = supabase.from('revenue_items').select('*').order('month', { ascending: true })
+  if (selectedYear !== 'all') {
+    forecastRevQuery = forecastRevQuery.gte('month', `${selectedYear}-01`).lte('month', `${selectedYear}-12`)
+  }
   const [{ data: engagements }, { data: revenueItems }] = await Promise.all([
     supabase
       .from('engagements')
       .select('id, name, stage, contract_value, probability, company:companies(id, name)')
       .order('created_at', { ascending: false }),
-    supabase
-      .from('revenue_items')
-      .select('*')
-      .order('month', { ascending: true }),
+    forecastRevQuery,
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -774,10 +804,11 @@ export default async function FinancePage({
 
   return (
     <div>
+      <Suspense fallback={<div style={{ height: 34 }} />}><YearFilter /></Suspense>
       {tabBar}
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontFamily: 'var(--serif)', fontSize: 40, fontWeight: 600, color: 'var(--navy)', letterSpacing: '-0.5px', margin: 0 }}>
-          Forecast
+          Forecast{selectedYear !== 'all' ? ` · ${selectedYear}` : ''}
         </h1>
         <p style={{ color: 'var(--ink-soft)', fontSize: 15, fontFamily: 'var(--sans)', marginTop: 6, marginBottom: 0 }}>
           Revenue pipeline and forecast overview

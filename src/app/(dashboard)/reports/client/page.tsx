@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import ReportNav from '@/components/reports/ReportNav'
 import PrintButton from '@/components/reports/PrintButton'
+import EmailReportButton from '@/components/reports/EmailReportButton'
 import { ENGAGEMENT_TYPE_LABELS, ENGAGEMENT_STAGE_LABELS } from '@/lib/types'
 
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -244,6 +245,7 @@ export default async function ClientReportPage({
               {company.name}
             </h1>
             <PrintButton />
+            <EmailReportButton reportName="Client Report" />
           </div>
         </div>
 

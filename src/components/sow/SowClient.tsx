@@ -21,9 +21,12 @@ interface Props {
   engagementId: string
 }
 
+const _MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
 function fmtDate(d: string | null | undefined): string {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const dt = new Date(d)
+  return `${_MO[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`
 }
 
 function fmtMoney(v: number | null | undefined): string {
@@ -388,9 +391,8 @@ function SowEditor({
   engagementId: string
   engagement: Props['engagement']
 }) {
-  type SowWithSig = Sow & { signature_requested_at?: string | null; signature_requested_to?: string | null }
   const router = useRouter()
-  const [sow, setSow] = useState<SowWithSig>(initialSow as SowWithSig)
+  const [sow, setSow] = useState<Sow>(initialSow)
   const [deliverables, setDeliverables] = useState<SowDeliverable[]>(
     initialSow.deliverables ?? []
   )
@@ -512,30 +514,48 @@ function SowEditor({
     setDeliverables(prev => prev.filter(d => d.id !== id))
   }
 
+  const [sigName, setSigName] = useState('')
+
   // Send for signature
   async function sendForSignature() {
     if (!sigEmail) return
     setSigSending(true)
-    const resp = await fetch('/api/sow/send-signature', {
+    const resp = await fetch('/api/sow/request-signature', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sow_id: sow.id,
         to_email: sigEmail,
+        to_name: sigName || sigEmail,
         message: sigMessage,
         engagement_name: engagement?.name ?? '',
         sow_title: sow.title,
         sow_url: `${window.location.origin}/engagements/${sow.engagement_id}/sow`,
       }),
     })
+    const result = await resp.json().catch(() => ({})) as { ok?: boolean; method?: string }
     setSigSending(false)
-    if (resp.ok) {
-      setSow(prev => ({ ...prev, signature_requested_at: new Date().toISOString(), signature_requested_to: sigEmail }))
+    if (resp.ok && result.ok) {
+      setSow(prev => ({
+        ...prev,
+        status: 'sent',
+        signature_requested_at: new Date().toISOString(),
+        signature_requested_to: sigEmail,
+      }))
       setShowSigModal(false)
       setSigEmail('')
+      setSigName('')
       setSigMessage('')
+      if (result.method === 'dropbox_sign') {
+        setStatusMsg('E-signature request sent via Dropbox Sign')
+      } else if (result.method === 'email_fallback') {
+        setStatusMsg('Sent via email (Dropbox Sign fallback)')
+      } else {
+        setStatusMsg('Sent via email')
+      }
+      setTimeout(() => setStatusMsg(null), 4000)
     } else {
-      setStatusMsg('Failed to send — check your email configuration.')
+      setStatusMsg('Failed to send — check your configuration.')
     }
   }
 
@@ -849,7 +869,38 @@ function SowEditor({
         )}
         {(sow.status === 'sent' || sow.status === 'signed' || sow.status === 'active') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {!sow.signature_requested_at ? (
+            {sow.status === 'signed' ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'var(--success-soft)', color: 'var(--success)',
+                borderRadius: 5, padding: '6px 12px',
+                fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)',
+              }}>
+                ✓ Signed{sow.signed_date ? ` · ${fmtShortDate(sow.signed_date)}` : ''}
+              </span>
+            ) : sow.signature_link && sow.status === 'sent' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  background: '#d8dde8', color: 'var(--navy)',
+                  borderRadius: 5, padding: '6px 12px',
+                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)',
+                }}>
+                  ✉ E-signature request sent — awaiting signing
+                </span>
+                {sow.signature_requested_at && (
+                  <span style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'var(--sans)' }}>
+                    Sent to {sow.signature_requested_to} on {fmtShortDate(sow.signature_requested_at)}
+                  </span>
+                )}
+                <button
+                  onClick={() => setShowSigModal(true)}
+                  style={{ ...actionBtnStyle('#2a6296'), padding: '6px 12px', fontSize: 12 }}
+                >
+                  Resend
+                </button>
+              </div>
+            ) : !sow.signature_requested_at ? (
               <button
                 onClick={() => setShowSigModal(true)}
                 style={actionBtnStyle('#2a6296')}
@@ -1278,25 +1329,46 @@ function SowEditor({
             <div style={{ borderBottom: '1px solid var(--line)', marginBottom: 20 }} />
 
             <div style={{ display: 'grid', gap: 14 }}>
-              <div>
-                <label style={{
-                  display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
-                  textTransform: 'uppercase', color: 'var(--ink-soft)', marginBottom: 4,
-                }}>
-                  Send to email *
-                </label>
-                <input
-                  type="email"
-                  value={sigEmail}
-                  onChange={e => setSigEmail(e.target.value)}
-                  placeholder="client@example.com"
-                  style={{
-                    border: '1px solid var(--line)', borderRadius: 5, padding: '8px 10px',
-                    fontSize: 13, fontFamily: 'var(--sans)', color: 'var(--ink)',
-                    background: '#fff', width: '100%', outline: 'none', boxSizing: 'border-box',
-                  }}
-                  autoFocus
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{
+                    display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
+                    textTransform: 'uppercase', color: 'var(--ink-soft)', marginBottom: 4,
+                  }}>
+                    Recipient name
+                  </label>
+                  <input
+                    type="text"
+                    value={sigName}
+                    onChange={e => setSigName(e.target.value)}
+                    placeholder="Jane Smith"
+                    style={{
+                      border: '1px solid var(--line)', borderRadius: 5, padding: '8px 10px',
+                      fontSize: 13, fontFamily: 'var(--sans)', color: 'var(--ink)',
+                      background: '#fff', width: '100%', outline: 'none', boxSizing: 'border-box',
+                    }}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label style={{
+                    display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
+                    textTransform: 'uppercase', color: 'var(--ink-soft)', marginBottom: 4,
+                  }}>
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={sigEmail}
+                    onChange={e => setSigEmail(e.target.value)}
+                    placeholder="client@example.com"
+                    style={{
+                      border: '1px solid var(--line)', borderRadius: 5, padding: '8px 10px',
+                      fontSize: 13, fontFamily: 'var(--sans)', color: 'var(--ink)',
+                      background: '#fff', width: '100%', outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
               </div>
               <div>
                 <label style={{

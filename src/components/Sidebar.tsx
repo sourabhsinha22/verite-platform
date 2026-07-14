@@ -1,13 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
   FileText, Settings, LogOut, TrendingUp, FileCheck,
-  Kanban, Building, Plug, Search, Gauge,
+  Kanban, Building, Plug, Search, BarChart2, Users, DollarSign, FolderOpen, GraduationCap,
 } from 'lucide-react'
 
 const NAV_GROUPS = [
@@ -20,8 +20,17 @@ const NAV_GROUPS = [
       { href: '/tasks',       label: 'My Tasks',    icon: CheckSquare },
       { href: '/engagements', label: 'Engagements', icon: Briefcase },
       { href: '/pipeline',    label: 'Pipeline',    icon: Kanban },
-      { href: '/velocity',   label: 'Velocity',   icon: Gauge },
-      { href: '/outreach',   label: 'Outreach',   icon: Search },
+      { href: '/team',        label: 'Team',        icon: Users },
+    ],
+  },
+  {
+    id: 'sales',
+    label: 'Sales',
+    defaultOpen: false,
+    items: [
+      { href: '/sales-intelligence', label: 'Sales Intel',  icon: BarChart2 },
+      { href: '/outreach',           label: 'Outreach',     icon: Search },
+      { href: '/nouvelleed',         label: 'NouvelleED',   icon: GraduationCap },
     ],
   },
   {
@@ -38,7 +47,8 @@ const NAV_GROUPS = [
     defaultOpen: false,
     items: [
       { href: '/invoices', label: 'Invoices',    icon: FileCheck },
-      { href: '/finance',  label: 'Analytics',  icon: TrendingUp },
+      { href: '/finance',        label: 'Analytics',    icon: TrendingUp },
+      { href: '/profitability', label: 'Profitability', icon: DollarSign },
       { href: '/money',    label: 'Cash & Ops', icon: Building },
     ],
   },
@@ -46,6 +56,7 @@ const NAV_GROUPS = [
 
 const STANDALONE = [
   { href: '/reports',               label: 'Reports',      icon: FileText },
+  { href: '/documents',             label: 'Documents',    icon: FolderOpen },
   { href: '/settings',              label: 'Settings',     icon: Settings },
   { href: '/settings/integrations', label: 'Integrations', icon: Plug },
 ]
@@ -54,15 +65,22 @@ interface CurrentUser {
   name: string
   email: string
   initials: string
+  role?: string
 }
 
 interface Props {
   currentUser?: CurrentUser
+  userRole?: string
 }
 
-export default function Sidebar({ currentUser }: Props) {
+export default function Sidebar({ currentUser, userRole }: Props) {
+  const role = userRole ?? 'Partner'
+  const showFinance = role === 'Admin' || role === 'Partner'
+  const showSettings = role === 'Admin'
   const pathname = usePathname()
+  const router = useRouter()
   const supabase = createClient()
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === 'undefined') {
@@ -70,19 +88,28 @@ export default function Sidebar({ currentUser }: Props) {
     }
     try {
       const saved = localStorage.getItem('verite-sidebar-groups')
-      return saved ? JSON.parse(saved) : { work: true, clients: true, finance: false }
+      return saved ? JSON.parse(saved) : { work: true, sales: false, clients: true, finance: false }
     } catch {
-      return { work: true, clients: true, finance: false }
+      return { work: true, sales: false, clients: true, finance: false }
     }
   })
 
   // Auto-expand Finance group when navigating to finance/money routes
   useEffect(() => {
-    const financeRoutes = ['/finance', '/money', '/invoices', '/revenue', '/pnl', '/cashflow', '/forecast', '/bank', '/distributions', '/reimbursements', '/contractors']
+    const financeRoutes = ['/finance', '/money', '/invoices', '/revenue', '/pnl', '/cashflow', '/forecast', '/bank', '/distributions', '/reimbursements', '/contractors', '/profitability']
     if (financeRoutes.some(r => pathname.startsWith(r))) {
       setOpenGroups(prev => {
         if (prev.finance) return prev
         const next = { ...prev, finance: true }
+        try { localStorage.setItem('verite-sidebar-groups', JSON.stringify(next)) } catch {}
+        return next
+      })
+    }
+    const salesRoutes = ['/sales-intelligence', '/outreach']
+    if (salesRoutes.some(r => pathname.startsWith(r))) {
+      setOpenGroups(prev => {
+        if (prev.sales) return prev
+        const next = { ...prev, sales: true }
         try { localStorage.setItem('verite-sidebar-groups', JSON.stringify(next)) } catch {}
         return next
       })
@@ -104,6 +131,7 @@ export default function Sidebar({ currentUser }: Props) {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/'
+    if (href === '/settings') return pathname === '/settings'
     if (href === '/finance') return pathname.startsWith('/finance') || ['/revenue', '/pnl', '/cashflow', '/forecast'].includes(pathname)
     if (href === '/money') return pathname.startsWith('/money') || ['/bank', '/distributions', '/reimbursements', '/contractors'].includes(pathname)
     return pathname.startsWith(href)
@@ -147,9 +175,52 @@ export default function Sidebar({ currentUser }: Props) {
         </div>
       </div>
 
+      {/* Search */}
+      <div style={{ marginBottom: '20px', padding: '0 4px', position: 'relative' }}>
+        <Search
+          size={13}
+          style={{
+            position: 'absolute',
+            left: 12,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'rgba(227,188,166,0.45)',
+            pointerEvents: 'none',
+          }}
+        />
+        <input
+          type="search"
+          autoComplete="new-password"
+          name="sidebar-search"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && searchQuery.trim().length >= 2) {
+              router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+              setSearchQuery('')
+            }
+          }}
+          placeholder="Search…"
+          style={{
+            width: '100%',
+            height: '32px',
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '6px',
+            paddingLeft: '30px',
+            paddingRight: '10px',
+            fontSize: '12px',
+            color: 'rgba(255,255,255,0.85)',
+            outline: 'none',
+            boxSizing: 'border-box',
+            fontFamily: 'var(--sans)',
+          }}
+        />
+      </div>
+
       {/* Nav */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1 }}>
-        {NAV_GROUPS.map(group => (
+        {NAV_GROUPS.filter(group => group.id !== 'finance' || showFinance).map(group => (
           <div key={group.id} style={{ marginBottom: 4 }}>
             <button
               onClick={() => toggleGroup(group.id)}
@@ -198,7 +269,10 @@ export default function Sidebar({ currentUser }: Props) {
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '8px 0' }} />
 
         {/* Standalone items */}
-        {STANDALONE.map(({ href, label, icon: Icon }) => (
+        {STANDALONE.filter(item => {
+          if (item.href === '/settings' || item.href === '/settings/integrations') return showSettings
+          return true
+        }).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
@@ -245,8 +319,21 @@ export default function Sidebar({ currentUser }: Props) {
               <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {currentUser.name}
               </div>
-              <div style={{ fontSize: '11px', color: '#9a9aa5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {currentUser.email}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <div style={{ fontSize: '11px', color: '#9a9aa5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {currentUser.email}
+                </div>
+                {currentUser.role && (
+                  <span style={{
+                    fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em',
+                    textTransform: 'uppercase', padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                    background: currentUser.role === 'Admin' ? 'rgba(37,49,74,0.8)' : currentUser.role === 'Partner' ? 'rgba(95,62,63,0.8)' : 'rgba(255,255,255,0.15)',
+                    color: '#fff',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                  }}>
+                    {currentUser.role}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -272,9 +359,6 @@ export default function Sidebar({ currentUser }: Props) {
           <LogOut size={13} style={{ opacity: 0.8 }} />
           Sign out
         </button>
-        <div style={{ fontSize: '11px', color: '#555', marginTop: '8px', padding: '0 10px' }}>
-          Data stored securely in Supabase
-        </div>
       </div>
     </aside>
   )

@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic'
 
+import { redirect } from 'next/navigation'
+import { getCurrentUser, canAccessFinance } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/ui/StatCard'
 import Link from 'next/link'
@@ -15,8 +17,10 @@ function fmt(n: number) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
+const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function fmtDate(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const dt = new Date(d + 'T00:00:00')
+  return `${MO[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`
 }
 
 const TABS = [
@@ -40,6 +44,11 @@ export default async function MoneyPage({
 }) {
   const { tab = 'bank' } = await searchParams
   const activeTab = TABS.find(t => t.id === tab) ? tab : 'bank'
+
+  const currentUser = await getCurrentUser()
+  if (!canAccessFinance(currentUser?.role ?? 'Associate')) {
+    redirect('/dashboard')
+  }
 
   const supabase = await createClient()
 

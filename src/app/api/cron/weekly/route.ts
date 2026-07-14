@@ -20,15 +20,23 @@ export async function GET(request: Request) {
     { data: tasks },
     { data: invoices },
     { data: engagements },
+    { data: notifSettings },
   ] = await Promise.all([
     supabase.from('team_members').select('name, email').not('email', 'is', null),
     supabase.from('tasks').select('*, engagement:engagements(id, name)'),
     supabase.from('invoices').select('*, company:companies(name)').is('paid_date', null),
     supabase.from('engagements').select('id, name, lead, stage, expected_close_date, contract_value, company:companies(name)').eq('stage', 'active'),
+    supabase.from('notification_settings').select('email, notify_tasks_due'),
   ])
+
+  const notifByEmail: Record<string, { notify_tasks_due?: boolean | null }> = {}
+  for (const s of notifSettings ?? []) {
+    if (s.email) notifByEmail[s.email] = s
+  }
 
   for (const member of teamMembers ?? []) {
     if (!member.email) continue
+    if (notifByEmail[member.email]?.notify_tasks_due === false) continue
 
     const name = member.name
     const firstName = name.split(' ')[0]

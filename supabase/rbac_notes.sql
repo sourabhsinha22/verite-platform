@@ -1,0 +1,23 @@
+-- ROLE-BASED ACCESS CONTROL — Future RLS Implementation Notes
+-- Current state: roles are enforced at UI level only
+--
+-- When ready to enforce at database level, implement these policies:
+--
+-- Associates should only see engagements where lead matches their name:
+-- DROP POLICY "auth_all_engagements" ON engagements;
+-- CREATE POLICY "role_engagements" ON engagements FOR ALL TO authenticated
+--   USING (
+--     lead = (SELECT name FROM team_members WHERE auth_user_id = auth.uid())
+--     OR (SELECT role FROM team_members WHERE auth_user_id = auth.uid()) IN ('Admin', 'Partner')
+--   );
+--
+-- Finance tables (revenue_items, invoices, expenses) — Partners and Admins only:
+-- DROP POLICY "auth_all_revenue_items" ON revenue_items;
+-- CREATE POLICY "role_revenue_items" ON revenue_items FOR ALL TO authenticated
+--   USING ((SELECT role FROM team_members WHERE auth_user_id = auth.uid()) IN ('Admin', 'Partner'));
+--
+-- Team members table — only Admins can modify:
+-- DROP POLICY "auth_all_team_members" ON team_members;
+-- CREATE POLICY "role_team_members_read" ON team_members FOR SELECT TO authenticated USING (true);
+-- CREATE POLICY "role_team_members_write" ON team_members FOR INSERT, UPDATE, DELETE TO authenticated
+--   USING ((SELECT role FROM team_members WHERE auth_user_id = auth.uid()) = 'Admin');

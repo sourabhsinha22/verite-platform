@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
   Engagement,
@@ -281,33 +282,40 @@ function KanbanCard({ card, dimmed, onDragStart, calendlyUrl }: CardProps) {
         userSelect: 'none',
       }}
     >
-      {/* Company */}
-      {card.company && (
-        <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--sans)', marginBottom: 3, fontWeight: 500 }}>
-          {card.company.name}
+      {/* Clickable header area → engagement detail */}
+      <Link
+        href={`/engagements/${card.id}`}
+        onClick={e => e.stopPropagation()}
+        style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
+      >
+        {/* Company */}
+        {card.company && (
+          <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--sans)', marginBottom: 3, fontWeight: 500 }}>
+            {card.company.name}
+          </div>
+        )}
+        {/* Name */}
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)', fontFamily: 'var(--sans)', marginBottom: 7, lineHeight: 1.3 }}>
+          {card.name}
         </div>
-      )}
-      {/* Name */}
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)', fontFamily: 'var(--sans)', marginBottom: 7, lineHeight: 1.3 }}>
-        {card.name}
-      </div>
-      {/* Type badge */}
-      <div style={{ marginBottom: 8 }}>
-        <span style={{
-          display: 'inline-block',
-          background: 'var(--line-soft)',
-          color: 'var(--ink-soft)',
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          padding: '2px 7px',
-          borderRadius: 3,
-          fontFamily: 'var(--sans)',
-        }}>
-          {ENGAGEMENT_TYPE_LABELS[card.engagement_type]}
-        </span>
-      </div>
+        {/* Type badge */}
+        <div style={{ marginBottom: 8 }}>
+          <span style={{
+            display: 'inline-block',
+            background: 'var(--line-soft)',
+            color: 'var(--ink-soft)',
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            padding: '2px 7px',
+            borderRadius: 3,
+            fontFamily: 'var(--sans)',
+          }}>
+            {ENGAGEMENT_TYPE_LABELS[card.engagement_type]}
+          </span>
+        </div>
+      </Link>
       {/* Owner + probability */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -350,6 +358,20 @@ function KanbanCard({ card, dimmed, onDragStart, calendlyUrl }: CardProps) {
           </span>
         )}
       </div>
+      {/* Next action badge */}
+      {card.next_action && (
+        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--line-soft)' }}>
+          {card.next_action_date && card.next_action_date < new Date().toISOString().slice(0,10) ? (
+            <span style={{ display: 'inline-block', fontSize: 10, background: 'var(--warn-soft)', color: 'var(--warn)', padding: '2px 8px', borderRadius: 3, fontWeight: 600 }}>
+              ⚠ {card.next_action.slice(0, 35)}{card.next_action.length > 35 ? '…' : ''}
+            </span>
+          ) : (
+            <div style={{ fontSize: 10, color: 'var(--ink-faint)' }}>
+              → {card.next_action.slice(0, 35)}{card.next_action.length > 35 ? '…' : ''}
+            </div>
+          )}
+        </div>
+      )}
       {/* Calendly book call */}
       {calendlyUrl && (
         <div style={{ marginTop: 8, borderTop: '1px solid var(--line-soft)', paddingTop: 7 }}>

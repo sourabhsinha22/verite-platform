@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import ReportNav from '@/components/reports/ReportNav'
 import PrintButton from '@/components/reports/PrintButton'
+import EmailReportButton from '@/components/reports/EmailReportButton'
 import { ENGAGEMENT_STAGE_LABELS } from '@/lib/types'
 
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -131,8 +132,9 @@ export default async function HealthReportPage() {
               Engagement health at a glance · Generated {dateLabel}
             </p>
           </div>
-          <div className="no-print">
+          <div className="no-print" style={{ display: 'flex', gap: 8 }}>
             <PrintButton />
+            <EmailReportButton reportName="Health Snapshot" />
           </div>
         </div>
 

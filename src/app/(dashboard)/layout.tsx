@@ -1,27 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/auth'
 import Sidebar from '@/components/Sidebar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  let currentUser: { name: string; email: string; initials: string } | undefined
+  let currentUser: { name: string; email: string; initials: string; role: string } | undefined
 
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
+    const user = await getCurrentUser()
     if (user) {
-      const { data: member } = await supabase
-        .from('team_members')
-        .select('name, email, auth_user_id')
-        .eq('auth_user_id', user.id)
-        .single()
-
-      if (member) {
-        const parts = (member.name ?? '').trim().split(/\s+/)
-        const initials = parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : (parts[0]?.[0] ?? '?').toUpperCase()
-        currentUser = { name: member.name, email: member.email, initials }
-      }
+      currentUser = { name: user.name, email: user.email, initials: user.initials, role: user.role }
     }
   } catch {
     // silently skip — currentUser stays undefined
@@ -29,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar currentUser={currentUser} />
+      <Sidebar currentUser={currentUser} userRole={currentUser?.role} />
       <main style={{ marginLeft: '240px', flex: 1, padding: '44px 60px', maxWidth: '1400px' }}>
         {children}
       </main>

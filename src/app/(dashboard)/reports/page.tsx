@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { Engagement, Task, ActivityEntryType, ENGAGEMENT_TYPE_LABELS, ENGAGEMENT_STAGE_LABELS } from '@/lib/types'
 import PrintButton from '@/components/reports/PrintButton'
+import EmailReportButton from '@/components/reports/EmailReportButton'
 import ReportFilters from '@/components/reports/ReportFilters'
 import PreparedFor from '@/components/reports/PreparedFor'
 import ReportNav from '@/components/reports/ReportNav'
@@ -253,6 +254,7 @@ export default async function ReportsPage({
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
             <PreparedFor />
             <PrintButton />
+            <EmailReportButton reportName="Status Report" />
           </div>
         </div>
 

@@ -2,14 +2,19 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { Invoice } from '@/lib/types'
+import PayButton from '@/components/pay/PayButton'
 
 interface Props {
   params: Promise<{ invoiceId: string }>
+  searchParams: Promise<{ session_id?: string }>
 }
+
+const _MO_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 function fmtDate(d: string | null | undefined): string {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  const dt = new Date(d + 'T00:00:00')
+  return `${_MO_LONG[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`
 }
 
 function fmtMoney(v: number | null | undefined): string {
@@ -17,8 +22,9 @@ function fmtMoney(v: number | null | undefined): string {
   return `$${Math.round(v).toLocaleString()}`
 }
 
-export default async function PayInvoicePage({ params }: Props) {
+export default async function PayInvoicePage({ params, searchParams }: Props) {
   const { invoiceId } = await params
+  const { session_id } = await searchParams
   const supabase = await createClient()
 
   const { data: invoice } = await supabase
@@ -181,34 +187,19 @@ export default async function PayInvoicePage({ params }: Props) {
               ))}
             </div>
 
-            {/* Payment section */}
-            {stripePublishableKey ? (
-              <div style={{
-                background: '#f5ebe3', border: '1px solid #ead9cd', borderRadius: 8,
-                padding: '20px', marginBottom: 20, textAlign: 'center',
-              }}>
-                <p style={{ fontSize: 14, color: '#5f5f6e', margin: '0 0 16px' }}>
-                  Secure online payment coming soon.
-                </p>
+            {/* Payment submitted banner */}
+            {session_id && (
+              <div style={{ background: '#e8f5e9', border: '1px solid #a5d6a7', borderRadius: 8, padding: '16px 20px', marginBottom: 20, textAlign: 'center' }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>✓</div>
+                <p style={{ fontSize: 14, color: '#2d6a3e', fontWeight: 600, margin: 0 }}>Payment submitted — we'll confirm shortly.</p>
+                <p style={{ fontSize: 12, color: '#5f8a6a', margin: '6px 0 0' }}>You'll receive a confirmation once processed.</p>
               </div>
-            ) : (
-              <div style={{
-                background: '#f5ebe3', border: '1px solid #ead9cd', borderRadius: 8,
-                padding: '24px', marginBottom: 20, textAlign: 'center',
-              }}>
-                <p style={{ fontSize: 14, color: '#5f5f6e', margin: '0 0 20px', lineHeight: 1.6 }}>
-                  To pay this invoice, please contact your Vérité account manager.
-                </p>
-                <a
-                  href={`mailto:tana@veritehealth.com?subject=Payment for Invoice ${invoiceNumber}`}
-                  style={{
-                    display: 'inline-block', background: '#5f3e3f', color: '#fff',
-                    padding: '12px 28px', borderRadius: 4, textDecoration: 'none',
-                    fontSize: 14, fontWeight: 600,
-                  }}
-                >
-                  Contact Us
-                </a>
+            )}
+
+            {/* Pay button */}
+            {!session_id && (
+              <div style={{ marginBottom: 20 }}>
+                <PayButton invoiceId={invoiceId} hasStripe={!!stripePublishableKey} invoiceNumber={invoiceNumber} />
               </div>
             )}
 

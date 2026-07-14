@@ -27,9 +27,11 @@ function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
+const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function fmtDate(d: string | null) {
   if (!d) return '—'
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const dt = new Date(d + 'T00:00:00')
+  return `${MO[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`
 }
 
 const STATUS_STYLES: Record<string, { bg: string; color: string }> = {
@@ -45,9 +47,19 @@ const BADGE: React.CSSProperties = {
   fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
 }
 
+const STATUS_CHIPS: { key: string; label: string }[] = [
+  { key: 'all',     label: 'All'     },
+  { key: 'draft',   label: 'Draft'   },
+  { key: 'sent',    label: 'Sent'    },
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'paid',    label: 'Paid'    },
+]
+
 export default function InvoicesClient({ invoices }: Props) {
   const router = useRouter()
   const [showModal, setShowModal] = useState(false)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
   const totalInvoiced = invoices.reduce((s, i) => s + i.amount, 0)
   const outstanding = invoices.filter(i => !i.paid_date).reduce((s, i) => s + i.amount, 0)
@@ -61,8 +73,22 @@ export default function InvoicesClient({ invoices }: Props) {
       }, 0) / paidWithDates.length)
     : null
 
+  const filtered = invoices.filter(inv => {
+    if (statusFilter !== 'all' && computeStatus(inv) !== statusFilter) return false
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      if (!inv.invoice_number.toLowerCase().includes(q) && !(inv.company?.name ?? '').toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
   return (
     <div>
+      <style>{`
+        .inv-row:hover { background: var(--line-soft) !important; }
+        .inv-row-overdue:hover { background: var(--danger-soft) !important; }
+      `}</style>
+
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
         {[
@@ -83,8 +109,49 @@ export default function InvoicesClient({ invoices }: Props) {
         ))}
       </div>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        {/* Search */}
+        <input
+          type="search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search invoice # or client…"
+          style={{
+            fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ink)',
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            borderRadius: 4, padding: '8px 12px', width: 240, outline: 'none', boxSizing: 'border-box',
+          }}
+        />
+
+        {/* Status chips */}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {STATUS_CHIPS.map(chip => {
+            const active = statusFilter === chip.key
+            return (
+              <button
+                key={chip.key}
+                onClick={() => setStatusFilter(chip.key)}
+                style={{
+                  fontFamily: 'var(--sans)', fontSize: 12, fontWeight: active ? 600 : 400,
+                  padding: '5px 12px', borderRadius: 20, cursor: 'pointer',
+                  border: active ? '1.5px solid var(--wine)' : '1px solid var(--line)',
+                  background: active ? 'var(--wine)' : 'var(--surface)',
+                  color: active ? '#fff' : 'var(--ink-soft)',
+                  transition: 'all 0.12s',
+                }}
+              >
+                {chip.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* CSV + New Invoice */}
+        <a href="/api/export?type=invoices" download style={{ fontSize: 12, color: 'var(--ink-soft)', border: '1px solid var(--line)', borderRadius: 4, padding: '7px 11px', textDecoration: 'none', fontFamily: 'var(--sans)', whiteSpace: 'nowrap' }}>↓ CSV</a>
         <button
           onClick={() => setShowModal(true)}
           style={{ background: 'var(--wine)', color: '#fff', padding: '9px 18px', borderRadius: 4, fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer' }}
@@ -93,9 +160,18 @@ export default function InvoicesClient({ invoices }: Props) {
         </button>
       </div>
 
+      {/* Count */}
+      <div style={{ fontSize: 12, color: 'var(--ink-faint)', marginBottom: 16 }}>
+        {filtered.length} invoice{filtered.length !== 1 ? 's' : ''}
+      </div>
+
       {invoices.length === 0 ? (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '64px 32px', textAlign: 'center', color: 'var(--ink-faint)' }}>
           No invoices yet. Click <strong>+ New Invoice</strong> to create one.
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '48px 32px', textAlign: 'center', color: 'var(--ink-faint)' }}>
+          No invoices match your search or filter.
         </div>
       ) : (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
@@ -108,12 +184,14 @@ export default function InvoicesClient({ invoices }: Props) {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv, i) => {
+              {filtered.map((inv, i) => {
                 const status = computeStatus(inv)
+                const isOverdue = status === 'overdue'
                 return (
-                  <tr key={inv.id} style={{ borderTop: i > 0 ? '1px solid var(--line-soft)' : undefined, background: status === 'overdue' ? '#fff8f8' : undefined }}
-                    onMouseEnter={e => (e.currentTarget.style.background = status === 'overdue' ? 'var(--danger-soft)' : 'var(--line-soft)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = status === 'overdue' ? '#fff8f8' : '')}
+                  <tr
+                    key={inv.id}
+                    className={isOverdue ? 'inv-row-overdue' : 'inv-row'}
+                    style={{ borderTop: i > 0 ? '1px solid var(--line-soft)' : undefined, background: isOverdue ? '#fff8f8' : undefined }}
                   >
                     <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>
                       {inv.invoice_number}
@@ -125,7 +203,7 @@ export default function InvoicesClient({ invoices }: Props) {
                     <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--ink-soft)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.engagement?.name || '—'}</td>
                     <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>{fmt(inv.amount)}</td>
                     <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{fmtDate(inv.date_sent)}</td>
-                    <td style={{ padding: '13px 16px', fontSize: 12, color: status === 'overdue' ? 'var(--danger)' : 'var(--ink-soft)', fontWeight: status === 'overdue' ? 600 : 400, whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 12, color: isOverdue ? 'var(--danger)' : 'var(--ink-soft)', fontWeight: isOverdue ? 600 : 400, whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
                     <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--success)', whiteSpace: 'nowrap' }}>{fmtDate(inv.paid_date)}</td>
                     <td style={{ padding: '13px 16px' }}>
                       <span style={{ ...BADGE, ...STATUS_STYLES[status] }}>{status}</span>

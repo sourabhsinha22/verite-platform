@@ -100,6 +100,13 @@ export interface Engagement {
   win_loss_reason: string
   outcomes: Record<string, unknown>
   stage_history: Record<string, string>
+  engagement_category: 'nouvelleed' | 'verite_client' | 'other'
+  demo_date: string | null
+  demo_outcome: '' | 'positive' | 'neutral' | 'negative' | 'no_show'
+  demo_notes: string
+  reference_call_agreed: boolean
+  reference_call_contact: string
+  competitor_name: string
   source: OutreachSource | null
   source_detail: string | null
   apollo_contact_id: string | null
@@ -314,6 +321,9 @@ export interface Sow {
   client_signatory: string
   verite_signatory: string
   notes: string
+  signature_link: string | null
+  signature_requested_at: string | null
+  signature_requested_to: string | null
   created_at: string
   updated_at: string
   phases?: SowPhase[]

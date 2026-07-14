@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import SowClient from '@/components/sow/SowClient'
+import TemplatePicker from '@/components/sow/TemplatePicker'
 import { Engagement, Sow } from '@/lib/types'
 
 interface Props {
@@ -13,7 +14,7 @@ export default async function SowPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: engagement }, { data: sows }, { data: teamMembers }] = await Promise.all([
+  const [{ data: engagement }, { data: sows }, { data: teamMembers }, { data: templates }] = await Promise.all([
     supabase
       .from('engagements')
       .select('*, company:companies(id, name)')
@@ -28,6 +29,11 @@ export default async function SowPage({ params }: Props) {
       .from('team_members')
       .select('id, name')
       .order('name'),
+    supabase
+      .from('sow_templates')
+      .select('id, name, description, engagement_type, phases')
+      .eq('is_active', true)
+      .order('created_at'),
   ])
 
   if (!engagement) {
@@ -83,12 +89,19 @@ export default async function SowPage({ params }: Props) {
         </p>
       </div>
 
-      <SowClient
-        engagement={engagement as Engagement & { company?: { id: string; name: string } }}
-        sow={sow}
-        teamMembers={teamMembers ?? []}
-        engagementId={id}
-      />
+      {sow ? (
+        <SowClient
+          engagement={engagement as Engagement & { company?: { id: string; name: string } }}
+          sow={sow}
+          teamMembers={teamMembers ?? []}
+          engagementId={id}
+        />
+      ) : (
+        <TemplatePicker
+          templates={templates ?? []}
+          engagementId={id}
+        />
+      )}
     </div>
   )
 }

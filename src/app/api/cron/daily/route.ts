@@ -74,6 +74,18 @@ export async function GET(request: Request) {
     .from('team_members')
     .select('name, email')
 
+  const { data: notifSettings } = await supabase
+    .from('notification_settings')
+    .select('team_member_id, email, notify_overdue_invoices, notify_tasks_due, notify_new_engagement, notify_task_assigned')
+
+  const notifByEmail: Record<string, typeof notifSettings extends (infer T)[] | null ? T : never> = {}
+  for (const s of notifSettings ?? []) {
+    if (s.email) notifByEmail[s.email] = s
+  }
+
+  const shouldNotify = (setting: typeof notifByEmail[string] | undefined, key: string): boolean =>
+    (setting as Record<string, unknown> | undefined)?.[key] !== false
+
   const memberByName = Object.fromEntries((teamMembers ?? []).map(m => [m.name, m.email]))
 
   for (const inv of overdueInvoices ?? []) {
@@ -81,6 +93,8 @@ export async function GET(request: Request) {
     if (!lead || !memberByName[lead]) continue
 
     const recipientEmail = memberByName[lead]
+    if (!shouldNotify(notifByEmail[recipientEmail], 'notify_overdue_invoices')) continue
+
     const alreadySent = await alreadyNotified(supabase, recipientEmail, 'invoice_overdue', inv.id, 24)
     if (alreadySent) continue
 
@@ -179,6 +193,8 @@ export async function GET(request: Request) {
     if (!lead || !memberByName[lead]) continue
 
     const recipientEmail = memberByName[lead]
+    if (!shouldNotify(notifByEmail[recipientEmail], 'notify_tasks_due')) continue
+
     const alreadySent = await alreadyNotified(supabase, recipientEmail, 'stale_engagement', eng.id, 72)
     if (alreadySent) continue
 
@@ -281,6 +297,47 @@ export async function GET(request: Request) {
   }
 
   results.push(`Health updated for ${healthUpdated} engagements`)
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 6. SOW SIGNATURE REMINDERS (5 days after sending, if not signed)
+  // ─────────────────────────────────────────────────────────────────────
+  const fiveDaysAgo = new Date()
+  fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5)
+  const fiveDaysAgoStr = fiveDaysAgo.toISOString()
+
+  const { data: pendingSows } = await supabase
+    .from('sows')
+    .select('id, title, engagement_id, signature_requested_at, signature_requested_to, engagement:engagements(id, name, lead, company:companies(name))')
+    .eq('status', 'sent')
+    .not('signature_requested_at', 'is', null)
+    .is('reminder_sent_at', null)
+    .lt('signature_requested_at', fiveDaysAgoStr)
+
+  for (const sow of pendingSows ?? []) {
+    const rawEng = sow.engagement as unknown as { id: string; name: string; lead: string; company: { name: string }[] | null } | null
+    const eng = rawEng ? { ...rawEng, company: Array.isArray(rawEng.company) ? (rawEng.company[0] ?? null) : rawEng.company } : null
+    if (!eng) continue
+    const lead = eng.lead
+    if (!lead || !memberByName[lead]) continue
+    const recipientEmail = memberByName[lead]
+
+    const alreadySent = await alreadyNotified(supabase, recipientEmail, 'sow_reminder', sow.id, 48)
+    if (alreadySent) continue
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://verite-platform.vercel.app'
+    const { ok } = await sendEmail({
+      to: recipientEmail,
+      subject: `Following up: Statement of Work for ${eng.name}`,
+      html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;color:#25314a"><div style="border-bottom:2px solid #5f3e3f;padding-bottom:12px;margin-bottom:20px"><h2 style="margin:0">SOW Signature Follow-up</h2></div><p>Hi ${lead.split(' ')[0]},</p><p>Just a gentle follow-up on the Statement of Work we sent for <strong>${eng.name}</strong> with <strong>${(eng.company as { name: string } | null)?.name ?? 'your client'}</strong>.</p><p>Please let us know if you have any questions or if you're ready to move forward.</p><a href="${appUrl}/engagements/${eng.id}/sow" style="display:inline-block;background:#5f3e3f;color:#fff;padding:11px 22px;border-radius:4px;text-decoration:none;font-size:14px;margin-top:16px">View Statement of Work →</a></div>`
+    })
+
+    if (ok) {
+      await supabase.from('sows').update({ reminder_sent_at: new Date().toISOString() }).eq('id', sow.id)
+      await logNotification(supabase, recipientEmail, 'sow_reminder', sow.id)
+      results.push(`SOW reminder sent to ${lead} — "${eng.name}"`)
+      totalActions++
+    }
+  }
 
   // Log the run
   await supabase.from('cron_log').insert({

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import ReportNav from '@/components/reports/ReportNav'
 import PrintButton from '@/components/reports/PrintButton'
+import EmailReportButton from '@/components/reports/EmailReportButton'
 import PeriodSelector from '@/components/reports/PeriodSelector'
 import { EXPENSE_CATEGORIES } from '@/lib/types'
 
@@ -235,6 +236,7 @@ export default async function FinancialReportPage({
           <div className="no-print" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <PeriodSelector current={period} />
             <PrintButton />
+            <EmailReportButton reportName="Financial Report" />
           </div>
         </div>
 

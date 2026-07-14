@@ -8,7 +8,12 @@ import { Trash2 } from 'lucide-react'
 
 interface Props {
   members: TeamMember[]
+  currentUserId?: string
+  isAdmin?: boolean
 }
+
+const ROLES = ['Admin', 'Partner', 'Associate'] as const
+type Role = typeof ROLES[number]
 
 const inputStyle: React.CSSProperties = {
   fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ink)',
@@ -21,14 +26,28 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 4, display: 'block',
 }
 
-export default function SettingsClient({ members: initialMembers }: Props) {
+function RoleChip({ role }: { role: string }) {
+  const bg = role === 'Admin' ? 'var(--navy)' : role === 'Partner' ? 'var(--wine)' : '#e8eaf0'
+  const color = role === 'Admin' || role === 'Partner' ? '#fff' : 'var(--ink)'
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+      padding: '2px 7px', borderRadius: 4, background: bg, color, flexShrink: 0,
+    }}>
+      {role || '—'}
+    </span>
+  )
+}
+
+export default function SettingsClient({ members: initialMembers, currentUserId, isAdmin }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [members, setMembers] = useState(initialMembers)
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', role: '', calendly_url: '' })
+  const [form, setForm] = useState({ name: '', email: '', role: 'Associate' as string, calendly_url: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [roleUpdating, setRoleUpdating] = useState<string | null>(null)
 
   const addMember = async () => {
     if (!form.name || !form.email) return
@@ -42,7 +61,7 @@ export default function SettingsClient({ members: initialMembers }: Props) {
     }
     if (data) {
       setMembers(prev => [...prev, data])
-      setForm({ name: '', email: '', role: '', calendly_url: '' })
+      setForm({ name: '', email: '', role: 'Associate', calendly_url: '' })
       setShowAdd(false)
     }
   }
@@ -63,21 +82,35 @@ export default function SettingsClient({ members: initialMembers }: Props) {
     setMembers(prev => prev.map(m => m.id === id ? { ...m, calendly_url: trimmed } : m))
   }
 
+  const updateRole = async (id: string, role: string) => {
+    setRoleUpdating(id)
+    const { error: err } = await supabase.from('team_members').update({ role }).eq('id', id)
+    setRoleUpdating(null)
+    if (err) {
+      alert('Failed to update role: ' + err.message)
+      return
+    }
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, role } : m))
+    router.refresh()
+  }
+
   return (
     <div>
       {/* Team Members */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', marginBottom: 32 }}>
         <div style={{ padding: '16px 20px', background: 'var(--line-soft)', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 600, color: 'var(--navy)' }}>Team Members</span>
-          <button
-            onClick={() => setShowAdd(v => !v)}
-            style={{ background: 'var(--wine)', color: '#fff', padding: '7px 14px', borderRadius: 4, fontSize: 12, border: 'none', cursor: 'pointer' }}
-          >
-            + Add Member
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowAdd(v => !v)}
+              style={{ background: 'var(--wine)', color: '#fff', padding: '7px 14px', borderRadius: 4, fontSize: 12, border: 'none', cursor: 'pointer' }}
+            >
+              + Add Member
+            </button>
+          )}
         </div>
 
-        {showAdd && (
+        {showAdd && isAdmin && (
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', background: '#fffaf7' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
@@ -90,7 +123,15 @@ export default function SettingsClient({ members: initialMembers }: Props) {
               </div>
               <div>
                 <label style={labelStyle}>Role</label>
-                <input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={inputStyle} placeholder="e.g. Analyst" />
+                <select
+                  value={form.role}
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                  style={{ ...inputStyle }}
+                >
+                  {ROLES.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div style={{ marginBottom: 14 }}>
@@ -143,13 +184,36 @@ export default function SettingsClient({ members: initialMembers }: Props) {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 12, fontWeight: 600, color: 'var(--wine)', flexShrink: 0,
                       }}>
-                        {m.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        {m.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                       </div>
                       {m.name}
                     </div>
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--ink-soft)' }}>{m.email}</td>
-                  <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--ink-soft)' }}>{m.role || '—'}</td>
+                  <td style={{ padding: '14px 20px', fontSize: 13 }}>
+                    {isAdmin ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <select
+                          value={m.role ?? 'Associate'}
+                          onChange={e => updateRole(m.id, e.target.value)}
+                          disabled={roleUpdating === m.id}
+                          style={{
+                            fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--ink)',
+                            background: 'var(--bg)', border: '1px solid var(--line)',
+                            borderRadius: 4, padding: '4px 8px', cursor: 'pointer',
+                            opacity: roleUpdating === m.id ? 0.6 : 1,
+                          }}
+                        >
+                          {ROLES.map(r => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                        <RoleChip role={m.role ?? 'Associate'} />
+                      </div>
+                    ) : (
+                      <RoleChip role={m.role ?? 'Associate'} />
+                    )}
+                  </td>
                   <td style={{ padding: '14px 20px', minWidth: 260 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
@@ -184,12 +248,14 @@ export default function SettingsClient({ members: initialMembers }: Props) {
                     </div>
                   </td>
                   <td style={{ padding: '14px 20px', width: 40 }}>
-                    <button
-                      onClick={() => deleteMember(m.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', padding: 0 }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => deleteMember(m.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', padding: 0 }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

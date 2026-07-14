@@ -13,12 +13,18 @@ import {
 import Badge from '@/components/ui/Badge'
 import { Trash2, Plus } from 'lucide-react'
 
+interface SowSummary {
+  id: string
+  status: string
+}
+
 interface Props {
   engagement: Engagement & { company?: { id: string; name: string } }
   tasks: Task[]
   revenueItems: RevenueItem[]
   activityLog: ActivityEntry[]
   leadCalendlyUrl?: string
+  sow?: SowSummary | null
 }
 
 const inputStyle: React.CSSProperties = {
@@ -87,7 +93,7 @@ const ENTRY_TYPE_PLACEHOLDERS: Record<ActivityEntryType, string> = {
 
 const ENTRY_TYPES: ActivityEntryType[] = ['note', 'call', 'meeting', 'email', 'status', 'milestone']
 
-export default function EngagementDetailClient({ engagement: initialEng, tasks: initialTasks, revenueItems: initialRevenue, activityLog: initialLog, leadCalendlyUrl }: Props) {
+export default function EngagementDetailClient({ engagement: initialEng, tasks: initialTasks, revenueItems: initialRevenue, activityLog: initialLog, leadCalendlyUrl, sow }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -107,6 +113,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
   const [showWinLossForm, setShowWinLossForm] = useState(false)
   const [winLossCategory, setWinLossCategory] = useState(eng.win_loss_category ?? '')
   const [winLossReason, setWinLossReason] = useState(eng.win_loss_reason ?? '')
+  const [winLossCompetitor, setWinLossCompetitor] = useState(eng.competitor_name ?? '')
 
   const saveEng = async (field: keyof Engagement, value: string | number | null | Record<string, unknown>) => {
     setEng(prev => ({ ...prev, [field]: value }))
@@ -136,6 +143,21 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
   const deleteTask = async (id: string) => {
     await supabase.from('tasks').delete().eq('id', id)
     setTasks(prev => prev.filter(t => t.id !== id))
+  }
+
+  const reorderTask = async (taskId: string, direction: 'up' | 'down') => {
+    setTasks(prev => {
+      const idx = prev.findIndex(t => t.id === taskId)
+      if (direction === 'up' && idx === 0) return prev
+      if (direction === 'down' && idx === prev.length - 1) return prev
+      const next = [...prev]
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+      ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
+      // Persist new order
+      supabase.from('tasks').update({ sort_order: swapIdx }).eq('id', next[swapIdx].id)
+      supabase.from('tasks').update({ sort_order: idx }).eq('id', next[idx].id)
+      return next
+    })
   }
 
   const addRevenueRow = async () => {
@@ -206,17 +228,33 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
       setShowWinLossForm(true)
     }
 
-    // Auto onboarding tasks when going active
-    if (newStage === 'active' && (prevStage === 'proposal_sent' || prevStage === 'qualified')) {
-      const onboardingTasks = NOUVELLEED_ONBOARDING_TASKS.map((title, i) => ({
-        engagement_id: eng.id,
-        title,
-        task_group: 'project' as const,
-        status: 'not-started' as const,
-        sort_order: 100 + i,
-      }))
+    // Auto onboarding tasks when going active — NouvelleED only
+    const isNouvelleED = eng.engagement_category === 'nouvelleed' || eng.name.toLowerCase().includes('nouvelleed')
+    if (newStage === 'active' && (prevStage === 'proposal_sent' || prevStage === 'qualified') && isNouvelleED) {
+      const td = new Date()
+      const addD = (n: number) => { const d = new Date(td); d.setDate(d.getDate() + n); return d.toISOString().slice(0,10) }
+      const taskConfig = [
+        { title: 'Setup call booked with client team',                   owner: eng.lead || '', due_date: addD(0) },
+        { title: 'Org configured in NouvelleED platform',                owner: 'Sourabh Sinha',  due_date: addD(2) },
+        { title: 'White-labeling + branding applied',                    owner: 'Sourabh Sinha',  due_date: addD(3) },
+        { title: 'First competency module built (AI Competency Studio)', owner: eng.lead || '', due_date: addD(7) },
+        { title: 'Team training session scheduled',                      owner: eng.lead || '', due_date: addD(7) },
+        { title: 'ANCC CE certificate test completed',                   owner: 'Charissa Duffy', due_date: addD(10) },
+        { title: 'Affinity CE certificates verified',                    owner: 'Charissa Duffy', due_date: addD(10) },
+        { title: 'Case study discussion scheduled (Day 30)',             owner: eng.lead || '', due_date: addD(30) },
+      ]
+      const onboardingTasks = taskConfig.map((t, i) => ({ engagement_id: eng.id, title: t.title, owner: t.owner, due_date: t.due_date, task_group: 'project' as const, status: 'not-started' as const, sort_order: 100 + i }))
       const { data: newTasks } = await supabase.from('tasks').insert(onboardingTasks).select()
       if (newTasks) setTasks(prev => [...prev, ...newTasks])
+    }
+
+    // Fire-and-forget deal closed notification
+    if (newStage === 'active') {
+      fetch('/api/engagements/deal-closed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engagement_id: eng.id, engagement_name: eng.name, company_name: eng.company?.name ?? '', contract_value: eng.contract_value, lead: eng.lead }),
+      }).catch(() => {})
     }
 
     startTransition(() => router.refresh())
@@ -252,6 +290,30 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
     if (eng.source && eng.source !== 'unknown') count++
     if (leadCalendlyUrl) count++
     return count
+  })()
+
+  // "What's next?" prompt
+  const whatsNext: { text: string; btnLabel: string; href: string } | null = (() => {
+    const overdueInvoice = revenue.find(r => r.invoice_id && (r as RevenueItem & { status?: string }).status === 'overdue')
+    if (eng.stage === 'active' && !sow) {
+      return { text: 'This deal is active — ready to create a Statement of Work?', btnLabel: 'Create SOW', href: `/engagements/${eng.id}/sow` }
+    }
+    if (eng.stage === 'active' && sow && sow.status === 'draft') {
+      return { text: 'SOW is in draft — send it to the client?', btnLabel: 'View SOW', href: `/engagements/${eng.id}/sow` }
+    }
+    if (eng.stage === 'active' && sow && (sow.status === 'signed' || sow.status === 'active') && revenue.length === 0) {
+      return { text: 'SOW signed — ready to create your first invoice?', btnLabel: 'Go to Invoices', href: '/invoices' }
+    }
+    if (eng.stage === 'active' && overdueInvoice) {
+      return { text: 'You have an overdue invoice — follow up with the client.', btnLabel: 'View Invoice', href: `/invoices/${overdueInvoice.invoice_id}` }
+    }
+    if (eng.stage === 'closed' && !eng.win_loss_category) {
+      return { text: 'Deal closed — log the outcome for reporting.', btnLabel: 'Log Outcome', href: `#win-loss` }
+    }
+    if (eng.stage === 'proposal_sent' && !eng.next_action) {
+      return { text: 'Proposal sent — set a follow-up action to stay on track.', btnLabel: 'Set Action', href: '#next-action' }
+    }
+    return null
   })()
 
   return (
@@ -302,6 +364,44 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
         {saveMsg && <span style={{ fontSize: 11, color: 'var(--success)' }}>{saveMsg}</span>}
       </div>
 
+      {/* What's next prompt bar */}
+      {whatsNext && (
+        <div style={{
+          background: 'var(--line-soft)',
+          borderLeft: '3px solid var(--wine)',
+          borderRadius: 6,
+          padding: '12px 16px',
+          marginBottom: 24,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          fontSize: 13,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 15 }}>💡</span>
+            <span style={{ color: 'var(--ink)' }}>{whatsNext.text}</span>
+          </div>
+          <a
+            href={whatsNext.href}
+            style={{
+              flexShrink: 0,
+              padding: '5px 12px',
+              borderRadius: 4,
+              border: '1px solid var(--wine)',
+              color: 'var(--wine)',
+              fontSize: 12,
+              fontWeight: 500,
+              textDecoration: 'none',
+              background: 'transparent',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {whatsNext.btnLabel}
+          </a>
+        </div>
+      )}
+
       {/* Win/Loss form (shown when stage = closed) */}
       {showWinLossForm && (
         <div style={{
@@ -322,6 +422,12 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
+            <input
+              value={winLossCompetitor}
+              onChange={e => setWinLossCompetitor(e.target.value)}
+              placeholder="Competitor (if applicable) — e.g. Relias, HealthStream, internal build"
+              style={{ fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--ink)', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 4, padding: '8px 10px', width: '100%', boxSizing: 'border-box' as const, outline: 'none' }}
+            />
             <textarea
               value={winLossReason}
               onChange={e => setWinLossReason(e.target.value)}
@@ -339,6 +445,7 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
                   await supabase.from('engagements').update({
                     win_loss_category: winLossCategory || null,
                     win_loss_reason: winLossReason,
+                    competitor_name: winLossCompetitor,
                   }).eq('id', eng.id)
                   setEng(prev => ({ ...prev, win_loss_category: winLossCategory || null, win_loss_reason: winLossReason }))
                   setShowWinLossForm(false)
@@ -442,16 +549,19 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
         {leadCalendlyUrl && (
           <div style={{ padding: '16px 20px' }}>
             <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Book a Call</div>
-            <a
-              href={leadCalendlyUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: 13, color: 'var(--wine)', textDecoration: 'none', fontWeight: 500 }}
-            >
+            <a href={leadCalendlyUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--wine)', textDecoration: 'none', fontWeight: 500 }}>
               📅 Schedule with {eng.lead || 'Lead'}
             </a>
           </div>
         )}
+        <div style={{ padding: '16px 20px' }}>
+          <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Category</div>
+          <select value={eng.engagement_category || 'verite_client'} onChange={async e => { const v = e.target.value as 'nouvelleed'|'verite_client'|'other'; setEng(p => ({...p, engagement_category: v})); await saveEng('engagement_category', v) }} style={{ ...selectStyle, fontSize: 11 }}>
+            <option value="verite_client">Vérité Client</option>
+            <option value="nouvelleed">NouvelleED</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
       </div>
 
       {/* Next Action Card */}
@@ -504,6 +614,45 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
         </div>
       </div>
 
+      {/* Demo & Reference card */}
+      {(['engaged','qualified','proposal_sent','active'] as EngagementStage[]).includes(eng.stage) && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '20px 24px', marginBottom: 32 }}>
+          <h2 style={{ fontFamily: 'var(--serif)', fontSize: 20, fontWeight: 600, color: 'var(--navy)', marginBottom: 16 }}>Demo &amp; Reference</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Demo Date</div>
+              <input type="date" defaultValue={eng.demo_date ?? ''} onBlur={e => saveEng('demo_date', e.target.value || null)} style={{ fontFamily: 'var(--sans)', fontSize: 13, border: '1px solid var(--line)', borderRadius: 4, padding: '6px 10px', background: 'var(--bg)', width: '100%', outline: 'none' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Demo Outcome</div>
+              <select value={eng.demo_outcome || ''} onChange={async e => { setEng(p => ({...p, demo_outcome: e.target.value as any})); await saveEng('demo_outcome', e.target.value) }} style={{ ...selectStyle, width: '100%', fontSize: 13 }}>
+                <option value="">—</option>
+                <option value="positive">Positive</option>
+                <option value="neutral">Neutral</option>
+                <option value="negative">Negative</option>
+                <option value="no_show">No-show</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 6 }}>Demo Notes</div>
+              <input defaultValue={eng.demo_notes ?? ''} onBlur={e => saveEng('demo_notes', e.target.value)} style={{ fontFamily: 'var(--sans)', fontSize: 13, border: '1px solid var(--line)', borderRadius: 4, padding: '6px 10px', background: 'var(--bg)', width: '100%', outline: 'none' }} placeholder="Key takeaway…" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24, paddingTop: 14, borderTop: '1px solid var(--line-soft)', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+              <input type="checkbox" checked={!!eng.reference_call_agreed} onChange={async e => { setEng(p => ({...p, reference_call_agreed: e.target.checked})); await supabase.from('engagements').update({ reference_call_agreed: e.target.checked }).eq('id', eng.id) }} style={{ width: 16, height: 16 }} />
+              Reference call agreed
+            </label>
+            {eng.reference_call_agreed && (
+              <input defaultValue={eng.reference_call_contact ?? ''} onBlur={e => saveEng('reference_call_contact', e.target.value)} placeholder="Contact name + role" style={{ fontFamily: 'var(--sans)', fontSize: 13, border: '1px solid var(--line)', borderRadius: 4, padding: '5px 10px', background: 'var(--bg)', outline: 'none', minWidth: 220 }} />
+            )}
+            {eng.reference_call_agreed && eng.reference_call_contact && (
+              <span style={{ fontSize: 12, background: 'var(--success-soft)', color: 'var(--success)', padding: '3px 10px', borderRadius: 12, fontWeight: 600 }}>✓ Reference: {eng.reference_call_contact}</span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Task Sections */}
       {[
         { group: 'sales' as Task['task_group'], label: 'Sales & Contracting', rows: salesTasks },
@@ -527,11 +676,11 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--line-soft)' }}>
-                    {['', 'Task', 'Owner', 'Due Date', 'Status', ''].map((h, i) => (
+                    {['', 'Task', 'Owner', 'Due Date', 'Status', '↕', ''].map((h, i) => (
                       <th key={i} style={{
                         textAlign: 'left', padding: '10px 12px', fontSize: 10,
                         color: 'var(--wine)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 600,
-                        width: i === 0 ? 32 : i === 5 ? 36 : 'auto',
+                        width: i === 0 ? 32 : i === 5 ? 28 : i === 6 ? 36 : 'auto',
                       }}>{h}</th>
                     ))}
                   </tr>
@@ -588,6 +737,12 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
                         >
                           {Object.entries(TASK_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
+                      </td>
+                      <td style={{ padding: '10px 6px', width: 28 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <button onClick={() => reorderTask(task.id, 'up')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--ink-faint)', lineHeight: 1, padding: '1px 3px' }}>▲</button>
+                          <button onClick={() => reorderTask(task.id, 'down')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--ink-faint)', lineHeight: 1, padding: '1px 3px' }}>▼</button>
+                        </div>
                       </td>
                       <td style={{ padding: '10px 12px', width: 36 }}>
                         <button
@@ -937,6 +1092,14 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
                 }}
               />
             </div>
+            {!!(outcomes as Record<string,unknown>).case_study_ready && eng.company?.id && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line-soft)' }}>
+                <button onClick={() => window.open('/reports/client?company_id=' + eng.company!.id, '_blank')} style={{ background: 'var(--wine)', color: '#fff', border: 'none', borderRadius: 4, padding: '9px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                  📊 Generate Case Study Report →
+                </button>
+                <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 6 }}>Opens the client report pre-filled with this engagement&apos;s outcome data</div>
+              </div>
+            )}
           </div>
         </div>
       )}

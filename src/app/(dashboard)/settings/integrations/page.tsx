@@ -1,13 +1,22 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser, isAdmin } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import IntegrationsClient from '@/components/settings/IntegrationsClient'
-import Link from 'next/link'
 
-export default async function IntegrationsPage() {
+export default async function IntegrationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const currentUser = await getCurrentUser()
+  if (!isAdmin(currentUser?.role ?? '')) redirect('/dashboard')
+
+  const { tab = 'apollo' } = await searchParams
   const supabase = await createClient()
 
-  const [{ data: integration }, { data: events }] = await Promise.all([
+  const [{ data: apolloIntegration }, { data: events }] = await Promise.all([
     supabase.from('integrations').select('*').eq('provider', 'apollo').single(),
     supabase
       .from('webhook_events')
@@ -16,6 +25,10 @@ export default async function IntegrationsPage() {
       .order('created_at', { ascending: false })
       .limit(5),
   ])
+
+  const stripeConfigured = !!(
+    process.env.STRIPE_SECRET_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  )
 
   return (
     <div style={{ maxWidth: 860 }}>
@@ -29,26 +42,11 @@ export default async function IntegrationsPage() {
         Connect external tools to automate your pipeline
       </p>
 
-      {/* Tab bar */}
-      <div style={{
-        display: 'flex', gap: 0, borderBottom: '2px solid var(--line)',
-        marginBottom: 32,
-      }}>
-        <Link
-          href="/settings/integrations"
-          style={{
-            padding: '10px 20px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
-            color: 'var(--wine)', borderBottom: '2px solid var(--wine)',
-            marginBottom: -2, display: 'inline-block',
-          }}
-        >
-          Apollo.io
-        </Link>
-      </div>
-
       <IntegrationsClient
-        integration={integration ?? null}
+        integration={apolloIntegration ?? null}
         recentEvents={events ?? []}
+        activeTab={tab}
+        stripeConfigured={stripeConfigured}
       />
     </div>
   )

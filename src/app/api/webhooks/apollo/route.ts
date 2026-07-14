@@ -162,6 +162,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (!engagementId && contactEmail) {
+      const { data: emailEng } = await supabase.from('engagements').select('id, stage').eq('prospect_email', contactEmail).single()
+      if (emailEng) { engagementId = emailEng.id; existingStage = emailEng.stage }
+    }
+
     const isMeeting = eventType === 'meeting.created' || eventType === 'emailer_campaign.contact_booked_meeting'
     const isReplied = eventType === 'emailer_message.replied' || eventType === 'emailer_campaign.contact_replied'
     const isClicked = eventType === 'emailer_message.clicked'
@@ -238,10 +243,22 @@ export async function POST(req: NextRequest) {
       const { data: teamMembers } = await supabase.from('team_members').select('name, email')
       const allEmails = (teamMembers ?? []).map((m: { email: string }) => m.email).filter(Boolean)
       if (allEmails.length > 0) {
+        const seq = (sequenceName ?? '').toLowerCase()
+        let alertRecipient = allEmails[0]
+        if (seq.includes('pmhnp') || seq.includes('behavioral') || seq.includes('program director')) {
+          const tana = teamMembers?.find(m => (m.name ?? '').includes('Tana'))
+          if (tana?.email) alertRecipient = tana.email
+        } else if (seq.includes('nursing') || seq.includes('cne') || seq.includes('education')) {
+          const shannon = teamMembers?.find(m => (m.name ?? '').includes('Shannon'))
+          if (shannon?.email) alertRecipient = shannon.email
+        } else if (seq.includes('compliance') || seq.includes('cmo') || seq.includes('cno')) {
+          const charissa = teamMembers?.find(m => (m.name ?? '').includes('Charissa'))
+          if (charissa?.email) alertRecipient = charissa.email
+        }
         const stage = isMeeting ? 'Qualified' : 'Engaged'
         const { sendEmail } = await import('@/lib/email')
         await sendEmail({
-          to: allEmails[0],
+          to: alertRecipient,
           subject: `New ${stage} lead: ${contactName ?? contactEmail ?? 'Unknown'} — ${companyName ?? ''}`,
           html: `
             <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; color: #25314a;">

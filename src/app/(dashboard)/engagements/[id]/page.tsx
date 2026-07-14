@@ -76,7 +76,7 @@ export default async function EngagementDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <EngagementDetailClient engagement={eng} tasks={taskList} revenueItems={revenue} activityLog={log} leadCalendlyUrl={leadCalendlyUrl} />
+      <EngagementDetailClient engagement={eng} tasks={taskList} revenueItems={revenue} activityLog={log} leadCalendlyUrl={leadCalendlyUrl} sow={latestSow} />
       <DocumentsSection engagementId={id} currentUserName={currentUserName} initialDocuments={docList} />
     </div>
   )

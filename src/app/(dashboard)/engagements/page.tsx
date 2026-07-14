@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { Suspense } from 'react'
 import EngagementsClient from '@/components/engagements/EngagementsClient'
 import { computeHealth } from '@/lib/types'
 
@@ -9,15 +10,17 @@ export default async function EngagementsPage() {
 
   const today = new Date().toISOString().slice(0, 10)
 
-  const [{ data: engagements }, { data: tasks }, { data: invoices }, { data: activityMax }] = await Promise.all([
+  const [{ data: engagements }, { data: tasks }, { data: invoices }, { data: activityRaw }, { data: teamMembers }] = await Promise.all([
     supabase.from('engagements').select('*, company:companies(id, name)').order('created_at', { ascending: false }),
     supabase.from('tasks').select('engagement_id, status, due_date'),
     supabase.from('invoices').select('engagement_id, due_date, paid_date'),
     supabase.from('activity_log').select('engagement_id, created_at').order('created_at', { ascending: false }),
+    supabase.from('team_members').select('id, name').order('name'),
   ])
 
-  // Build progress map: engagementId -> % done
+  // Progress map: engagementId -> % done
   const progressMap: Record<string, number> = {}
+  const taskCountMap: Record<string, number> = {}
   const countMap: Record<string, { done: number; total: number }> = {}
   for (const t of tasks ?? []) {
     if (!countMap[t.engagement_id]) countMap[t.engagement_id] = { done: 0, total: 0 }
@@ -26,29 +29,26 @@ export default async function EngagementsPage() {
   }
   for (const [id, { done, total }] of Object.entries(countMap)) {
     progressMap[id] = total > 0 ? Math.round((done / total) * 100) : 0
+    taskCountMap[id] = total
   }
 
-  // Build last activity map: engagementId -> latest created_at
+  // Last activity map: engagementId -> latest created_at
   const lastActivityMap: Record<string, string> = {}
-  for (const a of activityMax ?? []) {
-    if (!lastActivityMap[a.engagement_id]) {
-      lastActivityMap[a.engagement_id] = a.created_at
-    }
+  for (const a of activityRaw ?? []) {
+    if (!lastActivityMap[a.engagement_id]) lastActivityMap[a.engagement_id] = a.created_at
   }
 
-  // Build health map
+  // Health maps
   const healthMap: Record<string, 'green' | 'yellow' | 'red'> = {}
+  const healthFactorsMap: Record<string, { blockedTasks: number; overdueTasks: number; overdueInvoiceAging: number; sowExpiryDays: number | null; daysSinceActivity: number | null }> = {}
   for (const eng of engagements ?? []) {
     const engTasks = (tasks ?? []).filter(t => t.engagement_id === eng.id)
     const engInvoices = (invoices ?? []).filter(inv => inv.engagement_id === eng.id)
 
     const blockedTasks = engTasks.filter(t => t.status === 'blocked').length
     const overdueTasks = engTasks.filter(t => t.status !== 'done' && t.due_date && t.due_date < today).length
-
     const lastAct = lastActivityMap[eng.id]
-    const daysSinceActivity = lastAct
-      ? Math.floor((Date.now() - new Date(lastAct).getTime()) / 86400000)
-      : null
+    const daysSinceActivity = lastAct ? Math.floor((Date.now() - new Date(lastAct).getTime()) / 86400000) : null
 
     let overdueInvoiceAging = 0
     for (const inv of engInvoices) {
@@ -58,11 +58,9 @@ export default async function EngagementsPage() {
       }
     }
 
-    const sowExpiryDays = eng.end_date
-      ? Math.floor((new Date(eng.end_date).getTime() - Date.now()) / 86400000)
-      : null
-
+    const sowExpiryDays = eng.end_date ? Math.floor((new Date(eng.end_date).getTime() - Date.now()) / 86400000) : null
     healthMap[eng.id] = computeHealth({ blockedTasks, overdueTasks, daysSinceActivity, overdueInvoiceAging, sowExpiryDays })
+    healthFactorsMap[eng.id] = { blockedTasks, overdueTasks, overdueInvoiceAging, sowExpiryDays, daysSinceActivity }
   }
 
   return (
@@ -75,7 +73,17 @@ export default async function EngagementsPage() {
           {(engagements ?? []).length} total &middot; {(engagements ?? []).filter(e => e.stage === 'active').length} active
         </p>
       </div>
-      <EngagementsClient engagements={engagements ?? []} progressMap={progressMap} healthMap={healthMap} />
+      <Suspense fallback={<div style={{ color: 'var(--ink-faint)', fontFamily: 'var(--sans)', fontSize: 14 }}>Loading…</div>}>
+        <EngagementsClient
+          engagements={engagements ?? []}
+          progressMap={progressMap}
+          taskCountMap={taskCountMap}
+          lastActivityMap={lastActivityMap}
+          healthMap={healthMap}
+          healthFactorsMap={healthFactorsMap}
+          teamMembers={teamMembers ?? []}
+        />
+      </Suspense>
     </div>
   )
 }
