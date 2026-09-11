@@ -562,6 +562,33 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
             <option value="other">Other</option>
           </select>
         </div>
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600, marginBottom: 2 }}>Weekly Status Email</div>
+              <div style={{ fontSize: 11, color: '#9a9aa5' }}>Send client updates every Friday</div>
+            </div>
+            <button
+              onClick={async () => {
+                const next = !(eng as any).status_email_enabled
+                setEng(p => ({ ...p, status_email_enabled: next } as any))
+                await supabase.from('engagements').update({ status_email_enabled: next }).eq('id', eng.id)
+                setSaveMsg('Saved')
+                setTimeout(() => setSaveMsg(''), 2000)
+              }}
+              style={{
+                width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
+                background: (eng as any).status_email_enabled ? '#5f3e3f' : '#ddd',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 3, left: (eng as any).status_email_enabled ? 18 : 3,
+                width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+              }} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Next Action Card */}
