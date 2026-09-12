@@ -561,6 +561,11 @@ export default function EngagementDetailClient({ engagement: initialEng, tasks: 
             <option value="nouvelleed">NouvelleED</option>
             <option value="other">Other</option>
           </select>
+          {(eng as any).engagement_category === 'nouvelleed' && (
+            <a href="/nouvelleed" style={{ display: 'inline-block', marginTop: 8, fontSize: 11, color: 'var(--wine)', textDecoration: 'none', fontWeight: 500 }}>
+              View in NouvelleED Tracker →
+            </a>
+          )}
         </div>
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
