@@ -43,27 +43,31 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
   const supabase = createClient()
   const router = useRouter()
   const [members, setMembers] = useState(initialMembers)
-  const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', role: 'Associate' as string, calendly_url: '' })
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviteForm, setInviteForm] = useState({ email: '', role: 'Associate' as string })
+  const [inviteSent, setInviteSent] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null)
 
-  const addMember = async () => {
-    if (!form.name || !form.email) return
+  const sendInvite = async () => {
+    if (!inviteForm.email) return
     setError('')
     setSaving(true)
-    const { data, error: err } = await supabase.from('team_members').insert(form).select().single()
+    const res = await fetch('/api/invites/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inviteForm),
+    })
     setSaving(false)
-    if (err) {
-      setError(err.message)
+    if (!res.ok) {
+      const d = await res.json()
+      setError(d.error ?? 'Failed to send invite')
       return
     }
-    if (data) {
-      setMembers(prev => [...prev, data])
-      setForm({ name: '', email: '', role: 'Associate', calendly_url: '' })
-      setShowAdd(false)
-    }
+    setInviteSent(inviteForm.email)
+    setInviteForm({ email: '', role: 'Associate' })
+    setShowInvite(false)
   }
 
   const deleteMember = async (id: string) => {
@@ -84,10 +88,17 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
 
   const updateRole = async (id: string, role: string) => {
     setRoleUpdating(id)
-    const { error: err } = await supabase.from('team_members').update({ role }).eq('id', id)
+    const member = members.find(m => m.id === id)
+    const [r1, r2] = await Promise.all([
+      supabase.from('team_members').update({ role }).eq('id', id),
+      // Also sync to org_members if auth_user_id is known
+      member?.auth_user_id
+        ? supabase.from('org_members').update({ role }).eq('user_id', member.auth_user_id)
+        : Promise.resolve({ error: null }),
+    ])
     setRoleUpdating(null)
-    if (err) {
-      alert('Failed to update role: ' + err.message)
+    if (r1.error) {
+      alert('Failed to update role: ' + r1.error.message)
       return
     }
     setMembers(prev => prev.map(m => m.id === id ? { ...m, role } : m))
@@ -102,47 +113,33 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
           <span style={{ fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 600, color: 'var(--navy)' }}>Team Members</span>
           {isAdmin && (
             <button
-              onClick={() => setShowAdd(v => !v)}
+              onClick={() => { setShowInvite(v => !v); setError(''); setInviteSent('') }}
               style={{ background: 'var(--wine)', color: '#fff', padding: '7px 14px', borderRadius: 4, fontSize: 12, border: 'none', cursor: 'pointer' }}
             >
-              + Add Member
+              + Invite Member
             </button>
           )}
         </div>
 
-        {showAdd && isAdmin && (
+        {inviteSent && (
+          <div style={{ padding: '12px 20px', background: '#f0fdf4', borderBottom: '1px solid var(--line)', fontSize: 13, color: '#166534' }}>
+            ✓ Invite sent to <strong>{inviteSent}</strong>
+          </div>
+        )}
+
+        {showInvite && isAdmin && (
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', background: '#fffaf7' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={labelStyle}>Name *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <div>
                 <label style={labelStyle}>Email *</label>
-                <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} style={inputStyle} />
+                <input type="email" value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} style={inputStyle} placeholder="colleague@company.com" />
               </div>
               <div>
                 <label style={labelStyle}>Role</label>
-                <select
-                  value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                  style={{ ...inputStyle }}
-                >
-                  {ROLES.map(r => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
+                <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))} style={{ ...inputStyle }}>
+                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Calendly URL (optional)</label>
-              <input
-                value={form.calendly_url}
-                onChange={e => setForm(f => ({ ...f, calendly_url: e.target.value }))}
-                style={inputStyle}
-                placeholder="https://calendly.com/..."
-                type="url"
-              />
             </div>
             {error && (
               <div style={{ marginBottom: 10, padding: '7px 12px', background: 'var(--danger-soft)', borderRadius: 4, color: 'var(--danger)', fontSize: 13 }}>
@@ -150,10 +147,10 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={addMember} disabled={saving} style={{ background: 'var(--wine)', color: '#fff', padding: '7px 14px', borderRadius: 4, fontSize: 13, border: 'none', cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
-                {saving ? 'Saving…' : 'Add'}
+              <button onClick={sendInvite} disabled={saving} style={{ background: 'var(--wine)', color: '#fff', padding: '7px 14px', borderRadius: 4, fontSize: 13, border: 'none', cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Sending…' : 'Send Invite'}
               </button>
-              <button onClick={() => { setShowAdd(false); setError('') }} style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--navy)', padding: '7px 14px', borderRadius: 4, fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => { setShowInvite(false); setError('') }} style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--navy)', padding: '7px 14px', borderRadius: 4, fontSize: 13, cursor: 'pointer' }}>
                 Cancel
               </button>
             </div>

@@ -346,6 +346,8 @@ export interface TeamMember {
   role: string
   calendly_url: string
   avatar_url: string | null
+  auth_user_id?: string | null
+  org_id?: string | null
 }
 
 export const WIN_LOSS_LABELS: Record<string, string> = {

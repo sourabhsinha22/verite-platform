@@ -6,6 +6,9 @@ export interface CurrentUser {
   name: string
   role: 'Admin' | 'Partner' | 'Associate' | string
   initials: string
+  orgId: string | null
+  orgSlug: string | null
+  orgBrand: Record<string, string> | null
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -13,18 +16,29 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data: member } = await supabase
-    .from('team_members')
-    .select('name, role')
-    .eq('auth_user_id', user.id)
-    .single()
+  // Fetch display info from team_members (name, email) and role from org_members (authoritative)
+  const [{ data: member }, { data: orgMembership }] = await Promise.all([
+    supabase.from('team_members').select('name, role').eq('auth_user_id', user.id).single(),
+    supabase.from('org_members').select('role, org_id, orgs(id, slug, brand)').eq('user_id', user.id).limit(1).single(),
+  ])
 
   const name = member?.name ?? user.email?.split('@')[0] ?? 'User'
-  // Degrade to Partner (not Associate) so existing users without a record don't get locked out
-  const role = member?.role ?? 'Partner'
+  // org_members is authoritative for role; fall back to team_members, then Partner
+  const role = (orgMembership?.role ?? member?.role ?? 'Partner') as string
   const initials = name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2)
 
-  return { id: user.id, email: user.email ?? '', name, role, initials }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const org = (orgMembership?.orgs as any) as { id: string; slug: string; brand: Record<string, string> } | null
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    name,
+    role,
+    initials,
+    orgId: orgMembership?.org_id ?? null,
+    orgSlug: org?.slug ?? null,
+    orgBrand: org?.brand ?? null,
+  }
 }
 
 export function isAdmin(role: string) { return role === 'Admin' }
