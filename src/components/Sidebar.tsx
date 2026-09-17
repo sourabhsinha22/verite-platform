@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
   FileText, Settings, LogOut, TrendingUp, FileCheck,
-  Kanban, Building, Plug, Search, BarChart2, Users, DollarSign, FolderOpen, GraduationCap,
+  Kanban, Building, Plug, Search, BarChart2, Users, DollarSign, FolderOpen,
 } from 'lucide-react'
 
 const NAV_GROUPS = [
@@ -28,9 +28,8 @@ const NAV_GROUPS = [
     label: 'Sales',
     defaultOpen: false,
     items: [
-      { href: '/sales-intelligence', label: 'Sales Intel',  icon: BarChart2 },
-      { href: '/outreach',           label: 'Outreach',     icon: Search },
-      { href: '/nouvelleed',         label: 'NouvelleED',   icon: GraduationCap },
+      { href: '/sales-intelligence', label: 'Sales Intel', icon: BarChart2 },
+      { href: '/outreach',           label: 'Outreach',    icon: Search },
     ],
   },
   {
@@ -105,7 +104,7 @@ export default function Sidebar({ currentUser, userRole }: Props) {
         return next
       })
     }
-    const salesRoutes = ['/sales-intelligence', '/outreach']
+    const salesRoutes = ['/sales-intelligence', '/outreach', '/nouvelleed']
     if (salesRoutes.some(r => pathname.startsWith(r))) {
       setOpenGroups(prev => {
         if (prev.sales) return prev
