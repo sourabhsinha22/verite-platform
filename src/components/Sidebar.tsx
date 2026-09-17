@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Building2, Briefcase, CheckSquare,
   FileText, Settings, LogOut, TrendingUp, FileCheck,
-  Kanban, Building, Plug, Search, BarChart2, Users, DollarSign, FolderOpen,
+  Kanban, Building, Plug, Search, BarChart2, Users, DollarSign, FolderOpen, Shield,
 } from 'lucide-react'
 
 const NAV_GROUPS = [
@@ -58,6 +58,7 @@ const STANDALONE = [
   { href: '/documents',             label: 'Documents',    icon: FolderOpen },
   { href: '/settings',              label: 'Settings',     icon: Settings },
   { href: '/settings/integrations', label: 'Integrations', icon: Plug },
+  { href: '/admin',                 label: 'Super Admin',  icon: Shield, superAdminOnly: true },
 ]
 
 interface CurrentUser {
@@ -70,9 +71,10 @@ interface CurrentUser {
 interface Props {
   currentUser?: CurrentUser
   userRole?: string
+  isSuperAdmin?: boolean
 }
 
-export default function Sidebar({ currentUser, userRole }: Props) {
+export default function Sidebar({ currentUser, userRole, isSuperAdmin }: Props) {
   const role = userRole ?? 'Partner'
   const showFinance = role === 'Admin' || role === 'Partner'
   const showSettings = role === 'Admin'
@@ -270,6 +272,7 @@ export default function Sidebar({ currentUser, userRole }: Props) {
         {/* Standalone items */}
         {STANDALONE.filter(item => {
           if (item.href === '/settings' || item.href === '/settings/integrations') return showSettings
+          if ((item as { superAdminOnly?: boolean }).superAdminOnly) return isSuperAdmin
           return true
         }).map(({ href, label, icon: Icon }) => (
           <Link
