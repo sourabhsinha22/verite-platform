@@ -235,7 +235,7 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
         {members.length === 0 ? (
           <div style={{ padding: '32px 24px', color: 'var(--ink-faint)', fontSize: 13 }}>No team members yet.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
             <thead>
               <tr style={{ background: 'var(--line-soft)' }}>
                 {['Name', 'Email', 'Role', 'Meeting Link', ''].map(h => (
@@ -296,7 +296,7 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 
@@ -319,7 +319,7 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
           ) : invites.length === 0 ? (
             <div style={{ padding: '24px 20px', color: 'var(--ink-faint)', fontSize: 13 }}>No invitations sent yet.</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
               <thead>
                 <tr style={{ background: 'var(--line-soft)' }}>
                   {['Email', 'Role', 'Invited By', 'Sent', 'Status', ''].map(h => (
@@ -362,7 +362,7 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
       )}

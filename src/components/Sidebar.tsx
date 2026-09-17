@@ -83,12 +83,13 @@ export default function Sidebar({ currentUser, userRole, isSuperAdmin }: Props) 
   const supabase = createClient()
   const [searchQuery, setSearchQuery] = useState('')
 
+  const storageKey = `verite-sidebar-groups-${currentUser?.email ?? 'guest'}`
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === 'undefined') {
       return { work: true, clients: true, finance: false }
     }
     try {
-      const saved = localStorage.getItem('verite-sidebar-groups')
+      const saved = localStorage.getItem(storageKey)
       return saved ? JSON.parse(saved) : { work: true, sales: false, clients: true, finance: false }
     } catch {
       return { work: true, sales: false, clients: true, finance: false }
@@ -102,7 +103,7 @@ export default function Sidebar({ currentUser, userRole, isSuperAdmin }: Props) 
       setOpenGroups(prev => {
         if (prev.finance) return prev
         const next = { ...prev, finance: true }
-        try { localStorage.setItem('verite-sidebar-groups', JSON.stringify(next)) } catch {}
+        try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
         return next
       })
     }
@@ -111,16 +112,16 @@ export default function Sidebar({ currentUser, userRole, isSuperAdmin }: Props) 
       setOpenGroups(prev => {
         if (prev.sales) return prev
         const next = { ...prev, sales: true }
-        try { localStorage.setItem('verite-sidebar-groups', JSON.stringify(next)) } catch {}
+        try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
         return next
       })
     }
-  }, [pathname])
+  }, [pathname, storageKey])
 
   const toggleGroup = (id: string) => {
     setOpenGroups(prev => {
       const next = { ...prev, [id]: !prev[id] }
-      try { localStorage.setItem('verite-sidebar-groups', JSON.stringify(next)) } catch {}
+      try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
       return next
     })
   }
