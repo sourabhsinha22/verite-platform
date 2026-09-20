@@ -1,5 +1,8 @@
 export const dynamic = 'force-dynamic'
 
+import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { getCurrentUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/ui/StatCard'
 import InvoicesClient from '@/components/invoices/InvoicesClient'
@@ -27,6 +30,10 @@ function avgDaysToPay(invoices: Invoice[]) {
 }
 
 export default async function InvoicesPage() {
+  const activeOrgId = (await cookies()).get('verite-active-org')?.value
+  const currentUser = await getCurrentUser(activeOrgId)
+  if (!currentUser || currentUser.role === 'Associate') redirect('/dashboard')
+
   const supabase = await createClient()
   const { data: invoices } = await supabase
     .from('invoices')

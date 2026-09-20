@@ -76,6 +76,12 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
   const [error, setError] = useState('')
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null)
 
+  // Branding state
+  const [brandPrimary, setBrandPrimary] = useState('#2f2e4b')
+  const [brandAccent, setBrandAccent] = useState('#5f3e3f')
+  const [brandSaving, setBrandSaving] = useState(false)
+  const [brandToast, setBrandToast] = useState('')
+
   // Pending invites state
   const [invites, setInvites] = useState<OrgInvite[]>([])
   const [invitesLoading, setInvitesLoading] = useState(false)
@@ -140,10 +146,18 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
     setInvites(prev => prev.filter(i => i.id !== id))
   }
 
-  const deleteMember = async (id: string) => {
-    if (!confirm('Remove this team member?')) return
-    const { error: err } = await supabase.from('team_members').delete().eq('id', id)
-    if (err) { alert('Failed to remove member: ' + err.message); return }
+  const deleteMember = async (id: string, name: string) => {
+    if (!confirm(`Remove ${name} from the team?`)) return
+    const res = await fetch('/api/team/members', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId: id }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      alert('Failed to remove member: ' + (d.error ?? 'Unknown error'))
+      return
+    }
     setMembers(prev => prev.filter(m => m.id !== id))
   }
 
@@ -166,6 +180,24 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
     if (r1.error) { alert('Failed to update role: ' + r1.error.message); return }
     setMembers(prev => prev.map(m => m.id === id ? { ...m, role } : m))
     router.refresh()
+  }
+
+  const saveBranding = async () => {
+    setBrandSaving(true)
+    setBrandToast('')
+    const res = await fetch('/api/settings/brand', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ primary: brandPrimary, accent: brandAccent }),
+    })
+    setBrandSaving(false)
+    if (res.ok) {
+      setBrandToast('Brand colors saved!')
+      setTimeout(() => setBrandToast(''), 3000)
+    } else {
+      const d = await res.json()
+      setBrandToast('Error: ' + (d.error ?? 'Failed to save'))
+    }
   }
 
   const pendingInvites = invites.filter(i => i.status === 'pending')
@@ -287,8 +319,8 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
                     </div>
                   </td>
                   <td style={{ padding: '14px 20px', width: 40 }}>
-                    {isAdmin && (
-                      <button onClick={() => deleteMember(m.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                    {isAdmin && m.id !== currentUserId && (
+                      <button onClick={() => deleteMember(m.id, m.name)} title="Remove member" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', padding: 0 }}>
                         <Trash2 size={13} />
                       </button>
                     )}
@@ -364,6 +396,69 @@ export default function SettingsClient({ members: initialMembers, currentUserId,
               </tbody>
             </table></div>
           )}
+        </div>
+      )}
+
+      {/* ── Branding ── */}
+      {isAdmin && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', marginBottom: 32 }}>
+          <div style={{ padding: '16px 20px', background: 'var(--line-soft)', borderBottom: '1px solid var(--line)' }}>
+            <span style={{ fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 600, color: 'var(--navy)' }}>Branding</span>
+          </div>
+          <div style={{ padding: '24px 24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, maxWidth: 480, marginBottom: 20 }}>
+              <div>
+                <label style={labelStyle}>Primary Color</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="color"
+                    value={brandPrimary}
+                    onChange={e => setBrandPrimary(e.target.value)}
+                    style={{ width: 36, height: 34, border: '1px solid var(--line)', borderRadius: 4, cursor: 'pointer', padding: 2 }}
+                  />
+                  <input
+                    type="text"
+                    value={brandPrimary}
+                    onChange={e => setBrandPrimary(e.target.value)}
+                    style={{ ...inputStyle, width: 100 }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Accent Color</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="color"
+                    value={brandAccent}
+                    onChange={e => setBrandAccent(e.target.value)}
+                    style={{ width: 36, height: 34, border: '1px solid var(--line)', borderRadius: 4, cursor: 'pointer', padding: 2 }}
+                  />
+                  <input
+                    type="text"
+                    value={brandAccent}
+                    onChange={e => setBrandAccent(e.target.value)}
+                    style={{ ...inputStyle, width: 100 }}
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Preview swatch */}
+            <div style={{ width: 180, height: 6, borderRadius: 3, background: `linear-gradient(90deg, ${brandPrimary}, ${brandAccent})`, marginBottom: 20 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={saveBranding}
+                disabled={brandSaving}
+                style={{ background: 'var(--wine)', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: brandSaving ? 0.7 : 1 }}
+              >
+                {brandSaving ? 'Saving…' : 'Save Branding'}
+              </button>
+              {brandToast && (
+                <span style={{ fontSize: 13, color: brandToast.startsWith('Error') ? '#c0392b' : '#166534' }}>
+                  {brandToast}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

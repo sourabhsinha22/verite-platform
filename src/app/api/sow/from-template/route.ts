@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -13,16 +14,17 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = await createClient()
+  const currentUser = await getCurrentUser()
 
-  // Fetch engagement to get default title info
-  const { data: engagement } = await supabase
-    .from('engagements')
-    .select('name, revenue_type, contract_value, lead, company:companies(name)')
-    .eq('id', engagement_id)
-    .single()
+  // Fetch engagement + org name for title
+  const [{ data: engagement }, { data: org }] = await Promise.all([
+    supabase.from('engagements').select('name, revenue_type, contract_value, lead, company:companies(name)').eq('id', engagement_id).single(),
+    currentUser?.orgId ? supabase.from('orgs').select('name').eq('id', currentUser.orgId).single() : Promise.resolve({ data: null }),
+  ])
 
   const companyName = (engagement as { company?: { name: string } | null } | null)?.company?.name ?? 'Client'
-  const defaultTitle = `Vérité Health Collective — ${companyName} — Statement of Work`
+  const orgName = (org as { name: string } | null)?.name ?? 'Our Organization'
+  const defaultTitle = `${orgName} — ${companyName} — Statement of Work`
 
   let sowInsert: Record<string, unknown> = {
     engagement_id,
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
     revenue_type: engagement?.revenue_type ?? 'project',
     total_value: engagement?.contract_value ?? null,
     verite_lead: engagement?.lead ?? '',
-    verite_signatory: 'Tana Whitt',
+    verite_signatory: currentUser?.name ?? '',
     payment_terms: 'Net 30',
     billing_frequency: 'monthly',
     objectives: '',

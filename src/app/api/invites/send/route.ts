@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
     to: email,
     subject: `You're invited to ${productName}`,
     html: inviteEmailHtml({ inviterName: currentUser.name, productName, role, acceptUrl }),
+    fromName: org?.name,
   })
 
   return NextResponse.json({ ok: true, inviteId: invite.id })

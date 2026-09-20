@@ -41,6 +41,7 @@ function fmtMoney(v: number | null | undefined): string {
 
 interface EngRow extends Omit<Engagement, 'company'> {
   company?: { id: string; name: string }
+  org_id?: string | null
 }
 
 interface HealthFactors {
@@ -59,6 +60,8 @@ interface Props {
   healthMap?: Record<string, string>
   healthFactorsMap?: Record<string, HealthFactors>
   teamMembers?: { id: string; name: string }[]
+  orgs?: Record<string, string>
+  isMultiOrg?: boolean
 }
 
 const STAGES: (EngagementStage | 'all')[] = [
@@ -373,6 +376,7 @@ function ProgressBar({ value, hasTasks }: { value: number; hasTasks: boolean }) 
 export default function EngagementsClient({
   engagements, progressMap, taskCountMap, lastActivityMap,
   healthMap = {}, healthFactorsMap = {}, teamMembers = [],
+  orgs = {}, isMultiOrg = false,
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
@@ -548,9 +552,16 @@ export default function EngagementsClient({
                     </td>
                     {/* Name + company */}
                     <td style={{ padding: '13px 14px', fontSize: 13, maxWidth: 240 }}>
-                      <Link href={`/engagements/${eng.id}`} style={{ fontWeight: 500, color: 'var(--navy)', textDecoration: 'none', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {eng.name}
-                      </Link>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Link href={`/engagements/${eng.id}`} style={{ fontWeight: 500, color: 'var(--navy)', textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {eng.name}
+                        </Link>
+                        {isMultiOrg && eng.org_id && orgs[eng.org_id] && (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10, background: 'rgba(0,0,0,0.07)', color: 'var(--ink-soft)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {orgs[eng.org_id]}
+                          </span>
+                        )}
+                      </div>
                       {eng.company && (
                         <Link href={`/directory/${eng.company.id}`} style={{ fontSize: 11, color: 'var(--ink-faint)', textDecoration: 'none', marginTop: 2, display: 'block' }}>
                           {eng.company.name}

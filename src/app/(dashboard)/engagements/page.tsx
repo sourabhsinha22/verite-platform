@@ -10,13 +10,23 @@ export default async function EngagementsPage() {
 
   const today = new Date().toISOString().slice(0, 10)
 
-  const [{ data: engagements }, { data: tasks }, { data: invoices }, { data: activityRaw }, { data: teamMembers }] = await Promise.all([
-    supabase.from('engagements').select('*, company:companies(id, name)').order('created_at', { ascending: false }),
+  const [{ data: engagements }, { data: tasks }, { data: invoices }, { data: activityRaw }, { data: teamMembers }, { data: orgMemberships }] = await Promise.all([
+    supabase.from('engagements').select('*, org_id, company:companies(id, name)').order('created_at', { ascending: false }),
     supabase.from('tasks').select('engagement_id, status, due_date'),
     supabase.from('invoices').select('engagement_id, due_date, paid_date'),
     supabase.from('activity_log').select('engagement_id, created_at').order('created_at', { ascending: false }),
     supabase.from('team_members').select('id, name').order('name'),
+    supabase.from('org_members').select('org_id, orgs(id, name)'),
   ])
+
+  // Build org map: org_id -> org name
+  const orgsMap: Record<string, string> = {}
+  for (const m of orgMemberships ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const org = (m.orgs as any) as { id: string; name: string } | null
+    if (org) orgsMap[org.id] = org.name
+  }
+  const isMultiOrg = Object.keys(orgsMap).length > 1
 
   // Progress map: engagementId -> % done
   const progressMap: Record<string, number> = {}
@@ -82,6 +92,8 @@ export default async function EngagementsPage() {
           healthMap={healthMap}
           healthFactorsMap={healthFactorsMap}
           teamMembers={teamMembers ?? []}
+          orgs={orgsMap}
+          isMultiOrg={isMultiOrg}
         />
       </Suspense>
     </div>

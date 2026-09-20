@@ -72,9 +72,11 @@ interface Props {
   currentUser?: CurrentUser
   userRole?: string
   isSuperAdmin?: boolean
+  orgName?: string
+  allOrgs?: { id: string; name: string; slug: string; role: string }[]
 }
 
-export default function Sidebar({ currentUser, userRole, isSuperAdmin }: Props) {
+export default function Sidebar({ currentUser, userRole, isSuperAdmin, orgName, allOrgs = [] }: Props) {
   const role = userRole ?? 'Partner'
   const showFinance = role === 'Admin' || role === 'Partner'
   const showSettings = role === 'Admin'
@@ -142,7 +144,7 @@ export default function Sidebar({ currentUser, userRole, isSuperAdmin }: Props) 
   return (
     <aside style={{
       width: '240px',
-      background: 'var(--indigo)',
+      background: 'var(--navy)',
       color: '#f3e4dc',
       padding: '32px 20px',
       position: 'fixed',
@@ -153,19 +155,32 @@ export default function Sidebar({ currentUser, userRole, isSuperAdmin }: Props) 
     }}>
       {/* Logo */}
       <div style={{ marginBottom: '36px', padding: '0 4px' }}>
-        <div style={{
-          fontFamily: 'var(--serif)',
-          fontSize: '26px',
-          fontWeight: 600,
-          lineHeight: 1.15,
-          marginBottom: '4px',
-          color: '#ffffff',
-        }}>
-          V<em style={{ color: 'var(--blush)', fontStyle: 'italic', fontWeight: 500 }}>é</em>rit<em style={{ color: 'var(--blush)', fontStyle: 'italic', fontWeight: 500 }}>é</em>
-          <span style={{ display: 'block', fontStyle: 'italic', color: 'var(--blush)', fontWeight: 500, fontSize: '22px' }}>
-            Health Collective
-          </span>
-        </div>
+        {orgName && orgName !== 'Vérité Health Collective' ? (
+          <div style={{
+            fontFamily: 'var(--serif)',
+            fontSize: '26px',
+            fontWeight: 600,
+            lineHeight: 1.15,
+            marginBottom: '4px',
+            color: '#ffffff',
+          }}>
+            {orgName}
+          </div>
+        ) : (
+          <div style={{
+            fontFamily: 'var(--serif)',
+            fontSize: '26px',
+            fontWeight: 600,
+            lineHeight: 1.15,
+            marginBottom: '4px',
+            color: '#ffffff',
+          }}>
+            V<em style={{ color: 'var(--blush)', fontStyle: 'italic', fontWeight: 500 }}>é</em>rit<em style={{ color: 'var(--blush)', fontStyle: 'italic', fontWeight: 500 }}>é</em>
+            <span style={{ display: 'block', fontStyle: 'italic', color: 'var(--blush)', fontWeight: 500, fontSize: '22px' }}>
+              Health Collective
+            </span>
+          </div>
+        )}
         <div style={{
           fontSize: '10px',
           fontWeight: 600,
@@ -295,6 +310,50 @@ export default function Sidebar({ currentUser, userRole, isSuperAdmin }: Props) 
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
+        {allOrgs.length > 1 && (
+          <div style={{ padding: '0 10px 10px' }}>
+            <div style={{
+              fontSize: '9px',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'rgba(227,188,166,0.4)',
+              marginBottom: '4px',
+            }}>
+              Workspace
+            </div>
+            <select
+              defaultValue={allOrgs.find(o => o.name === orgName)?.id ?? allOrgs[0]?.id}
+              onChange={async (e) => {
+                await fetch('/api/auth/set-active-org', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ orgId: e.target.value }),
+                })
+                window.location.reload()
+              }}
+              style={{
+                maxWidth: '200px',
+                width: '100%',
+                height: '28px',
+                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(0,0,0,0.2)',
+                color: '#e0d4cc',
+                fontSize: '12px',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              {allOrgs.map(org => (
+                <option key={org.id} value={org.id} style={{ background: '#1a1a2e', color: '#e0d4cc' }}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {currentUser && (
           <div style={{
             display: 'flex',

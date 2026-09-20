@@ -13,6 +13,7 @@ import {
 } from '@/lib/types'
 import Link from 'next/link'
 import { Plus, Trash2, FileText, Download, CheckCircle, Save, ArrowRight, FileCheck } from 'lucide-react'
+import SignatureModal from './SignatureModal'
 
 interface Props {
   engagement: Engagement & { company?: { id: string; name: string } }
@@ -403,6 +404,12 @@ function SowEditor({
   const [sigEmail, setSigEmail] = useState('')
   const [sigMessage, setSigMessage] = useState('')
   const [sigSending, setSigSending] = useState(false)
+  const [showSignModal, setShowSignModal] = useState(false)
+  const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(initialSow.signed_pdf_url ?? null)
+  const [clientEmailInput, setClientEmailInput] = useState('')
+  const [showClientEmailInput, setShowClientEmailInput] = useState(false)
+  const [clientReqSending, setClientReqSending] = useState(false)
+  const [clientSigningUrl, setClientSigningUrl] = useState<string | null>(null)
   const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
   function fmtShortDate(iso: string): string {
@@ -556,6 +563,26 @@ function SowEditor({
       setTimeout(() => setStatusMsg(null), 4000)
     } else {
       setStatusMsg('Failed to send — check your configuration.')
+    }
+  }
+
+  async function requestClientSignature() {
+    setClientReqSending(true)
+    const res = await fetch(`/api/sow/${sow.id}/request-client-signature`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientEmail: clientEmailInput || undefined }),
+    })
+    const json = await res.json() as { ok?: boolean; signingUrl?: string; error?: string }
+    setClientReqSending(false)
+    if (res.ok && json.ok) {
+      setClientSigningUrl(json.signingUrl ?? null)
+      setSow(prev => ({ ...prev, status: 'sent', signature_requested_at: new Date().toISOString(), signature_requested_to: clientEmailInput || null }))
+      setShowClientEmailInput(false)
+      setStatusMsg('Client signature link generated')
+      setTimeout(() => setStatusMsg(null), 3000)
+    } else {
+      setStatusMsg('Failed: ' + (json.error ?? 'Unknown error'))
     }
   }
 
@@ -816,6 +843,78 @@ function SowEditor({
             }, { type: col.type })}
           </div>
         ))}
+      </div>
+
+      {/* E-Sign actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap', background: 'var(--line-soft)', borderRadius: 8, padding: '12px 16px' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-soft)', fontFamily: 'var(--sans)', marginRight: 4 }}>E-Sign</span>
+        {!sow.internal_signed_at && (
+          <button
+            onClick={() => setShowSignModal(true)}
+            style={actionBtnStyle('var(--wine)')}
+          >
+            ✍ Sign SOW
+          </button>
+        )}
+        {sow.internal_signed_at && sow.status !== 'signed' && (
+          <>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--success-soft)', color: 'var(--success)', borderRadius: 5, padding: '6px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)' }}>
+              ✓ You signed
+            </span>
+            {signedPdfUrl && (
+              <a href={signedPdfUrl} target="_blank" style={actionBtnStyle('var(--navy)', true)}>
+                <Download size={14} /> Internal PDF
+              </a>
+            )}
+            {!showClientEmailInput && !clientSigningUrl && (
+              <button
+                onClick={() => setShowClientEmailInput(true)}
+                style={actionBtnStyle('#2a6296')}
+              >
+                ✉ Request Client Signature
+              </button>
+            )}
+            {showClientEmailInput && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  type="email"
+                  value={clientEmailInput}
+                  onChange={e => setClientEmailInput(e.target.value)}
+                  placeholder="client@example.com (optional)"
+                  style={{ border: '1px solid var(--line)', borderRadius: 5, padding: '6px 10px', fontSize: 13, fontFamily: 'var(--sans)', outline: 'none', minWidth: 220 }}
+                />
+                <button
+                  onClick={requestClientSignature}
+                  disabled={clientReqSending}
+                  style={{ ...actionBtnStyle('#2a6296'), opacity: clientReqSending ? 0.7 : 1 }}
+                >
+                  {clientReqSending ? 'Sending…' : 'Generate Link →'}
+                </button>
+                <button onClick={() => setShowClientEmailInput(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)', fontSize: 13 }}>Cancel</button>
+              </div>
+            )}
+            {clientSigningUrl && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, fontFamily: 'var(--sans)', color: 'var(--ink-soft)' }}>Signing link:</span>
+                <code style={{ fontSize: 12, background: '#f5f3ee', padding: '3px 8px', borderRadius: 4 }}>
+                  {typeof window !== 'undefined' ? `${window.location.origin}${clientSigningUrl}` : clientSigningUrl}
+                </code>
+              </div>
+            )}
+          </>
+        )}
+        {sow.status === 'signed' && (
+          <>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--success-soft)', color: 'var(--success)', borderRadius: 5, padding: '6px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)' }}>
+              ✓ Fully Executed
+            </span>
+            {(sow.signed_pdf_url || signedPdfUrl) && (
+              <a href={sow.signed_pdf_url || signedPdfUrl || '#'} target="_blank" style={actionBtnStyle('var(--navy)', true)}>
+                <Download size={14} /> Download Signed PDF
+              </a>
+            )}
+          </>
+        )}
       </div>
 
       {/* Status actions */}
@@ -1295,6 +1394,21 @@ function SowEditor({
           </div>
         ))}
       </div>
+
+      {/* Internal signature modal */}
+      {showSignModal && (
+        <SignatureModal
+          sowId={sow.id}
+          onSigned={(pdfUrl) => {
+            setSignedPdfUrl(pdfUrl)
+            setSow(prev => ({ ...prev, internal_signed_at: new Date().toISOString() }))
+            setShowSignModal(false)
+            setStatusMsg('SOW signed successfully')
+            setTimeout(() => setStatusMsg(null), 3000)
+          }}
+          onClose={() => setShowSignModal(false)}
+        />
+      )}
 
       {/* Send for Signature Modal */}
       {showSigModal && (

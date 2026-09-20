@@ -13,7 +13,7 @@ function fmtWeighted(value: number): string {
 export default async function PipelinePage() {
   const supabase = await createClient()
 
-  const [{ data: engagements }, { data: teamMembers }, { data: teamMembersCalendly }] = await Promise.all([
+  const [{ data: engagements }, { data: teamMembers }, { data: teamMembersCalendly }, { data: orgMemberships }] = await Promise.all([
     supabase
       .from('engagements')
       .select('*, company:companies(id, name), tasks(*)')
@@ -25,12 +25,22 @@ export default async function PipelinePage() {
     supabase
       .from('team_members')
       .select('name, calendly_url'),
+    supabase
+      .from('org_members')
+      .select('org_id, orgs(id, name)'),
   ])
 
   const calendlyMap: Record<string, string> = {}
   ;(teamMembersCalendly ?? []).forEach((m: { name: string; calendly_url: string | null }) => {
     if (m.calendly_url) calendlyMap[m.name] = m.calendly_url
   })
+
+  const orgsMap: Record<string, string> = {}
+  for (const m of orgMemberships ?? []) {
+    const org = (m.orgs as any) as { id: string; name: string } | null
+    if (org) orgsMap[org.id] = org.name
+  }
+  const isMultiOrg = Object.keys(orgsMap).length > 1
 
   type RawEngagement = Engagement & {
     company?: { id: string; name: string }
@@ -79,6 +89,8 @@ export default async function PipelinePage() {
         engagements={engagementCards}
         teamMembers={teamMembers ?? []}
         calendlyMap={calendlyMap}
+        orgsMap={orgsMap}
+        isMultiOrg={isMultiOrg}
       />
     </div>
   )

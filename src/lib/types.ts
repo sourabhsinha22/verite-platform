@@ -324,6 +324,10 @@ export interface Sow {
   signature_link: string | null
   signature_requested_at: string | null
   signature_requested_to: string | null
+  signed_pdf_url?: string | null
+  signing_token?: string | null
+  internal_signed_at?: string | null
+  client_signed_at?: string | null
   created_at: string
   updated_at: string
   phases?: SowPhase[]

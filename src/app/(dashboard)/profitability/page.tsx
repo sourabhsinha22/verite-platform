@@ -1,5 +1,8 @@
 export const dynamic = 'force-dynamic'
 
+import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { getCurrentUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -45,6 +48,10 @@ type EngRow = {
 }
 
 export default async function ProfitabilityPage() {
+  const activeOrgId = (await cookies()).get('verite-active-org')?.value
+  const currentUser = await getCurrentUser(activeOrgId)
+  if (!currentUser || currentUser.role === 'Associate') redirect('/dashboard')
+
   const supabase = await createClient()
 
   const [

@@ -9,35 +9,57 @@ export interface CurrentUser {
   orgId: string | null
   orgSlug: string | null
   orgBrand: Record<string, string> | null
+  orgName: string | null
+  allOrgs: { id: string; name: string; slug: string; role: string }[]
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export async function getCurrentUser(activeOrgId?: string): Promise<CurrentUser | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // Fetch display info from team_members (name, email) and role from org_members (authoritative)
-  const [{ data: member }, { data: orgMembership }] = await Promise.all([
+  // Fetch display info from team_members (name, email) and all org memberships
+  const [{ data: member }, { data: orgMemberships }] = await Promise.all([
     supabase.from('team_members').select('name, role').eq('auth_user_id', user.id).single(),
-    supabase.from('org_members').select('role, org_id, orgs(id, slug, brand)').eq('user_id', user.id).limit(1).single(),
+    supabase.from('org_members').select('role, org_id, orgs(id, slug, brand, name)').eq('user_id', user.id),
   ])
 
   const name = member?.name ?? user.email?.split('@')[0] ?? 'User'
-  // org_members is authoritative for role; fall back to team_members, then Partner
-  const role = (orgMembership?.role ?? member?.role ?? 'Partner') as string
   const initials = name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2)
 
+  // Build allOrgs list
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const org = (orgMembership?.orgs as any) as { id: string; slug: string; brand: Record<string, string> } | null
+  const allOrgs = (orgMemberships ?? []).map((m: any) => {
+    const org = m.orgs as { id: string; slug: string; name: string; brand: Record<string, string> } | null
+    return {
+      id: m.org_id as string,
+      name: org?.name ?? '',
+      slug: org?.slug ?? '',
+      role: m.role as string,
+    }
+  })
+
+  // Pick active org: prefer activeOrgId if it exists in memberships, else first
+  const activeMembership = (activeOrgId ? (orgMemberships?.find((m: any) => m.org_id === activeOrgId) ?? null) : null)
+    ?? orgMemberships?.[0]
+    ?? null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const org = (activeMembership?.orgs as any) as { id: string; slug: string; brand: Record<string, string>; name: string } | null
+  // org_members is authoritative for role; fall back to team_members, then Partner
+  const role = (activeMembership?.role ?? member?.role ?? 'Partner') as string
+
   return {
     id: user.id,
     email: user.email ?? '',
     name,
     role,
     initials,
-    orgId: orgMembership?.org_id ?? null,
+    orgId: activeMembership?.org_id ?? null,
     orgSlug: org?.slug ?? null,
     orgBrand: org?.brand ?? null,
+    orgName: org?.name ?? null,
+    allOrgs,
   }
 }
 

@@ -16,12 +16,15 @@ import { X, Plus, GripVertical } from 'lucide-react'
 interface EngagementCard extends Omit<Engagement, 'company'> {
   company?: { id: string; name: string }
   _progress: number
+  org_id?: string | null
 }
 
 interface Props {
   engagements: EngagementCard[]
   teamMembers: { id: string; name: string }[]
   calendlyMap?: Record<string, string>
+  orgsMap?: Record<string, string>
+  isMultiOrg?: boolean
 }
 
 const STAGE_ORDER: EngagementStage[] = ['prospect', 'engaged', 'qualified', 'proposal_sent', 'active', 'paused', 'closed']
@@ -259,9 +262,10 @@ interface CardProps {
   dimmed: boolean
   onDragStart: (id: string) => void
   calendlyUrl?: string
+  orgName?: string
 }
 
-function KanbanCard({ card, dimmed, onDragStart, calendlyUrl }: CardProps) {
+function KanbanCard({ card, dimmed, onDragStart, calendlyUrl, orgName }: CardProps) {
   const accent = STAGE_ACCENT[card.stage]
   const isClosedStage = card.stage === 'closed' || card.stage === 'paused'
 
@@ -293,6 +297,23 @@ function KanbanCard({ card, dimmed, onDragStart, calendlyUrl }: CardProps) {
           <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--sans)', marginBottom: 3, fontWeight: 500 }}>
             {card.company.name}
           </div>
+        )}
+        {/* Org pill (multi-org only) */}
+        {orgName && (
+          <span style={{
+            display: 'inline-block',
+            fontSize: 10,
+            fontWeight: 600,
+            fontFamily: 'var(--sans)',
+            letterSpacing: '0.06em',
+            padding: '1px 6px',
+            borderRadius: 10,
+            background: 'rgba(95,62,63,0.10)',
+            color: 'var(--wine)',
+            marginBottom: 4,
+          }}>
+            {orgName}
+          </span>
         )}
         {/* Name */}
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)', fontFamily: 'var(--sans)', marginBottom: 7, lineHeight: 1.3 }}>
@@ -406,7 +427,7 @@ function KanbanCard({ card, dimmed, onDragStart, calendlyUrl }: CardProps) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function PipelineClient({ engagements, teamMembers, calendlyMap = {} }: Props) {
+export default function PipelineClient({ engagements, teamMembers, calendlyMap = {}, orgsMap = {}, isMultiOrg = false }: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [cards, setCards] = useState<EngagementCard[]>(engagements)
@@ -555,6 +576,7 @@ export default function PipelineClient({ engagements, teamMembers, calendlyMap =
                     dimmed={ownerFilter !== null && card.lead !== ownerFilter}
                     onDragStart={handleDragStart}
                     calendlyUrl={card.lead ? calendlyMap[card.lead] : undefined}
+                    orgName={isMultiOrg && card.org_id ? orgsMap[card.org_id] : undefined}
                   />
                 ))}
 
