@@ -82,6 +82,32 @@ These were discussed but not yet prioritized. Need Tana's input on which to buil
 
 ---
 
+## Multi-tenant platform roadmap (as of Sep 2026)
+
+These items emerged from the multi-tenancy + e-signing build. Prioritized by ROI.
+
+### Near-term (high value, low lift)
+
+1. **Email delivery for signing requests** — `POST /api/sow/[id]/request-client-signature` generates the signing URL but doesn't email it. Wire Resend so the client receives the link directly. Same fix needed for org invite emails (currently fire-and-forget with no delivery).
+2. **Meridian admin auto-insert into `team_members`** — Creating an org via `/api/admin/orgs` adds the creator to `org_members` but not `team_members`. The seed script also missed this for `meridian.admin`. Fix the admin org-creation route to insert into both tables.
+3. **`GET /api/admin/orgs`** — Super-admin panel has no listing endpoint (route only has POST/DELETE). Add a `GET` export that returns all orgs with member counts for the admin dashboard.
+
+### Medium-term (product surface)
+
+4. **Client portal** — Token-gated or light-auth view where clients see their engagement status, SOW history, and invoices. Eliminates status-update emails and raises credibility. Builds on the existing `/sign/[token]` public-route pattern.
+5. **Invoice payments (Stripe)** — One-click "Pay Now" on client-facing invoice view. Webhook marks invoice `paid` in Supabase. Already have `/pay/[id]` route skeleton.
+6. **SOW template library** — Save/reuse SOW content per org rather than always generating from the engagement. Per-org template management in Settings. Extends existing `sows` + `sow_phases` schema.
+7. **In-app notifications** — Bell icon with a feed: SOW signed, invoice overdue, new team member added. Append-only `notifications` table with RLS; mark-read via PATCH.
+
+### Longer-term (platform maturity)
+
+8. **Audit log** — Append-only `events` table: who did what, when, on which org. Required for compliance once real money flows through the platform. Essential for selling to compliance-conscious buyers.
+9. **Stripe subscription billing** — Org-level plan tiers (seat count, SOW limit). `subscriptions` table per org; enforce limits in `getCurrentUser` and API guards.
+10. **Multi-signatory SOWs** — Currently one internal signer + one client signer. Larger deals need countersignatures from multiple stakeholders. Extend `sows` schema with a `signatories` array.
+11. **Mobile responsive layout** — Platform is desktop-first. Priority pages: dashboard, SOW view, signing flow. PWA manifest for on-site tablet use.
+
+---
+
 ## QuickBooks Online Integration — Notes (discuss with Tana)
 
 **Feasibility:** Yes, possible. QuickBooks Online has a full REST API with OAuth 2.0.
