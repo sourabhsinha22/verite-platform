@@ -108,6 +108,7 @@ export default function SignatureModal({ sowId, onSigned, onClose }: Props) {
         }}>
           <canvas
             ref={canvasRef}
+            suppressHydrationWarning
             style={{ width: '100%', height: 160, display: 'block', cursor: 'crosshair' }}
           />
           {isEmpty && (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -405,11 +405,22 @@ function SowEditor({
   const [sigMessage, setSigMessage] = useState('')
   const [sigSending, setSigSending] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
-  const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(initialSow.signed_pdf_url ?? null)
+  const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(null)
+
+  async function downloadSignedPdf() {
+    const res = await fetch(`/api/sow/${sow.id}/signed-pdf-url`)
+    const json = await res.json() as { url?: string; error?: string }
+    if (json.url) {
+      window.open(json.url, '_blank')
+    }
+  }
   const [clientEmailInput, setClientEmailInput] = useState('')
   const [showClientEmailInput, setShowClientEmailInput] = useState(false)
   const [clientReqSending, setClientReqSending] = useState(false)
   const [clientSigningUrl, setClientSigningUrl] = useState<string | null>(null)
+  const [origin, setOrigin] = useState('')
+  // Set origin client-side only to avoid hydration mismatch
+  useEffect(() => { setOrigin(window.location.origin) }, [])
   const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
   function fmtShortDate(iso: string): string {
@@ -861,10 +872,10 @@ function SowEditor({
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--success-soft)', color: 'var(--success)', borderRadius: 5, padding: '6px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)' }}>
               ✓ You signed
             </span>
-            {signedPdfUrl && (
-              <a href={signedPdfUrl} target="_blank" style={actionBtnStyle('var(--navy)', true)}>
+            {sow.signed_pdf_url && (
+              <button onClick={downloadSignedPdf} style={actionBtnStyle('var(--navy)', true)}>
                 <Download size={14} /> Internal PDF
-              </a>
+              </button>
             )}
             {!showClientEmailInput && !clientSigningUrl && (
               <button
@@ -897,7 +908,7 @@ function SowEditor({
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 12, fontFamily: 'var(--sans)', color: 'var(--ink-soft)' }}>Signing link:</span>
                 <code style={{ fontSize: 12, background: '#f5f3ee', padding: '3px 8px', borderRadius: 4 }}>
-                  {typeof window !== 'undefined' ? `${window.location.origin}${clientSigningUrl}` : clientSigningUrl}
+                  {origin ? `${origin}${clientSigningUrl}` : clientSigningUrl}
                 </code>
               </div>
             )}
@@ -908,10 +919,10 @@ function SowEditor({
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--success-soft)', color: 'var(--success)', borderRadius: 5, padding: '6px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)' }}>
               ✓ Fully Executed
             </span>
-            {(sow.signed_pdf_url || signedPdfUrl) && (
-              <a href={sow.signed_pdf_url || signedPdfUrl || '#'} target="_blank" style={actionBtnStyle('var(--navy)', true)}>
+            {sow.signed_pdf_url && (
+              <button onClick={downloadSignedPdf} style={actionBtnStyle('var(--navy)', true)}>
                 <Download size={14} /> Download Signed PDF
-              </a>
+              </button>
             )}
           </>
         )}
@@ -1400,8 +1411,7 @@ function SowEditor({
         <SignatureModal
           sowId={sow.id}
           onSigned={(pdfUrl) => {
-            setSignedPdfUrl(pdfUrl)
-            setSow(prev => ({ ...prev, internal_signed_at: new Date().toISOString() }))
+            setSow(prev => ({ ...prev, internal_signed_at: new Date().toISOString(), signed_pdf_url: pdfUrl || prev.signed_pdf_url }))
             setShowSignModal(false)
             setStatusMsg('SOW signed successfully')
             setTimeout(() => setStatusMsg(null), 3000)

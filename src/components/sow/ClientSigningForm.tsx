@@ -112,6 +112,7 @@ export default function ClientSigningForm({ token }: Props) {
           }}>
             <canvas
               ref={canvasRef}
+              suppressHydrationWarning
               style={{ width: '100%', height: 140, display: 'block', cursor: 'crosshair' }}
             />
             {isEmpty && (

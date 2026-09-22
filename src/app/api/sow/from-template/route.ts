@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
 
   let sowInsert: Record<string, unknown> = {
     engagement_id,
+    org_id: currentUser?.orgId ?? null,
     title: defaultTitle,
     version: 1,
     status: 'draft',
